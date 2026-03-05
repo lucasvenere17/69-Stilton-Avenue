@@ -1,0 +1,26 @@
+{
+  "id": "761f3ab8-4c31-4bf4-ac55-1afe81793eef",
+  "name": "Initial Renovation Plan",
+  "createdAt": "2026-03-05T06:37:47.695Z",
+  "updatedAt": "2026-03-05T06:37:47.695Z",
+  "blueprintData": {
+    "main": {
+      "walls": [],
+      "doors": [],
+      "windows": [],
+      "annotations": [],
+      "floor": "main"
+    },
+    "upper": {
+      "walls": [],
+      "doors": [],
+      "windows": [],
+      "annotations": [],
+      "floor": "upper"
+    }
+  },
+  "aiEdits": [],
+  "kitchenEdits": [],
+  "budgetItems": [],
+  "notes": ""
+}

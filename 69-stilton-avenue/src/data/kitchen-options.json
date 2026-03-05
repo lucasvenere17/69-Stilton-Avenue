@@ -1,0 +1,54 @@
+{
+  "components": [
+    {
+      "id": "island-stone",
+      "label": "Island Countertop",
+      "options": [
+        { "id": "is-granite-black", "name": "Black Granite", "color": "#1a1a1a", "prompt": "Change only the kitchen island countertop to polished black granite" },
+        { "id": "is-marble-white", "name": "White Marble", "color": "#f0ece4", "prompt": "Change only the kitchen island countertop to white Carrara marble with grey veining" },
+        { "id": "is-quartz-grey", "name": "Grey Quartz", "color": "#8a8a8a", "prompt": "Change only the kitchen island countertop to modern grey quartz" },
+        { "id": "is-butcher-block", "name": "Butcher Block", "color": "#b5813a", "prompt": "Change only the kitchen island countertop to warm butcher block wood" }
+      ]
+    },
+    {
+      "id": "cabinet-color",
+      "label": "Cabinet Color",
+      "options": [
+        { "id": "cab-white", "name": "Classic White", "color": "#f5f5f0", "prompt": "Change all kitchen cabinets to classic white shaker style" },
+        { "id": "cab-navy", "name": "Navy Blue", "color": "#1b2838", "prompt": "Change all kitchen cabinets to deep navy blue" },
+        { "id": "cab-sage", "name": "Sage Green", "color": "#8a9a7b", "prompt": "Change all kitchen cabinets to soft sage green" },
+        { "id": "cab-walnut", "name": "Dark Walnut", "color": "#4a3525", "prompt": "Change all kitchen cabinets to rich dark walnut wood" }
+      ]
+    },
+    {
+      "id": "backsplash",
+      "label": "Backsplash",
+      "options": [
+        { "id": "bs-subway-white", "name": "White Subway Tile", "color": "#ffffff", "prompt": "Change the kitchen backsplash to classic white subway tile" },
+        { "id": "bs-herringbone", "name": "Herringbone Marble", "color": "#e8e4dc", "prompt": "Change the kitchen backsplash to herringbone pattern marble tile" },
+        { "id": "bs-zellige", "name": "Green Zellige", "color": "#6b8f71", "prompt": "Change the kitchen backsplash to handmade green zellige tile" },
+        { "id": "bs-mosaic", "name": "Blue Mosaic", "color": "#3a5a8c", "prompt": "Change the kitchen backsplash to blue and white mosaic tile pattern" }
+      ]
+    },
+    {
+      "id": "hood-fan",
+      "label": "Range Hood",
+      "options": [
+        { "id": "hood-stainless", "name": "Stainless Steel", "color": "#c0c0c0", "prompt": "Change the range hood to a modern stainless steel chimney style hood" },
+        { "id": "hood-wood", "name": "Wood Covered", "color": "#a0784a", "prompt": "Change the range hood to a custom wood-covered hood with rustic appeal" },
+        { "id": "hood-copper", "name": "Copper", "color": "#b87333", "prompt": "Change the range hood to a hammered copper hood" },
+        { "id": "hood-white", "name": "White Integrated", "color": "#f0f0f0", "prompt": "Change the range hood to a sleek white integrated hood that matches the cabinets" }
+      ]
+    },
+    {
+      "id": "countertops",
+      "label": "Countertops",
+      "options": [
+        { "id": "ct-white-quartz", "name": "White Quartz", "color": "#f0ece8", "prompt": "Change all kitchen countertops to clean white quartz" },
+        { "id": "ct-black-granite", "name": "Black Granite", "color": "#1a1a1a", "prompt": "Change all kitchen countertops to polished black granite" },
+        { "id": "ct-concrete", "name": "Concrete", "color": "#a0a0a0", "prompt": "Change all kitchen countertops to poured concrete with a matte finish" },
+        { "id": "ct-marble", "name": "Calacatta Marble", "color": "#f8f4ee", "prompt": "Change all kitchen countertops to luxurious Calacatta marble" }
+      ]
+    }
+  ]
+}

@@ -1,313 +1,323 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
-import type { BudgetLineItem } from "@/lib/types";
-import { v4 as uuidv4 } from "uuid";
-import { exportScenarioJSON, generateShareUrl } from "@/lib/scenarioManager";
+import type { BudgetItem } from "@/lib/types";
 
-const DEFAULT_CATEGORIES = [
-  "Demolition",
-  "Framing",
-  "Electrical",
-  "Plumbing",
-  "Cabinetry",
-  "Countertops",
-  "Flooring",
-  "Paint",
-  "Fixtures",
-];
+type BudgetTab = "renovation" | "furniture" | "all";
 
-const DEFAULT_ITEMS: Omit<BudgetLineItem, "id">[] = [
-  { category: "Demolition", description: "Remove existing kitchen cabinets", quantity: 1, unit: "lot", unitCost: 2500, subtotal: 2500 },
-  { category: "Demolition", description: "Remove flooring", quantity: 800, unit: "sqft", unitCost: 3, subtotal: 2400 },
-  { category: "Framing", description: "New wall framing", quantity: 1, unit: "lot", unitCost: 3000, subtotal: 3000 },
-  { category: "Electrical", description: "Electrical updates", quantity: 1, unit: "lot", unitCost: 5000, subtotal: 5000 },
-  { category: "Plumbing", description: "Plumbing rough-in", quantity: 1, unit: "lot", unitCost: 4000, subtotal: 4000 },
-  { category: "Cabinetry", description: "New kitchen cabinets", quantity: 20, unit: "linear ft", unitCost: 350, subtotal: 7000 },
-  { category: "Countertops", description: "Quartz countertops", quantity: 45, unit: "sqft", unitCost: 85, subtotal: 3825 },
-  { category: "Flooring", description: "Engineered hardwood", quantity: 800, unit: "sqft", unitCost: 12, subtotal: 9600 },
-  { category: "Paint", description: "Interior painting", quantity: 2500, unit: "sqft", unitCost: 4, subtotal: 10000 },
-  { category: "Fixtures", description: "Light fixtures", quantity: 15, unit: "each", unitCost: 200, subtotal: 3000 },
-];
+function formatCurrency(amount: number): string {
+  if (amount === 0) return "TBD";
+  return `$${amount.toLocaleString()}`;
+}
+
+function groupByCategory(items: BudgetItem[]): Record<string, BudgetItem[]> {
+  const groups: Record<string, BudgetItem[]> = {};
+  items.forEach((item) => {
+    if (!groups[item.category]) groups[item.category] = [];
+    groups[item.category].push(item);
+  });
+  return groups;
+}
+
+function CategoryTable({
+  category,
+  items,
+  editingId,
+  onEdit,
+  onUpdateActualCost,
+}: {
+  category: string;
+  items: BudgetItem[];
+  editingId: string | null;
+  onEdit: (id: string | null) => void;
+  onUpdateActualCost: (item: BudgetItem, value: number) => void;
+}) {
+  const subtotal = items.reduce((sum, item) => sum + item.estimatedCost, 0);
+  const actualSubtotal = items.reduce((sum, item) => sum + item.actualCost, 0);
+
+  return (
+    <div className="border rounded-lg overflow-hidden mb-4">
+      <div className="bg-muted/50 px-4 py-2 flex items-center justify-between">
+        <h3 className="font-semibold text-sm">{category}</h3>
+        <span className="text-sm font-medium">
+          {formatCurrency(subtotal)}
+        </span>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/20">
+            <th className="text-left p-3 font-medium w-2/5">Item</th>
+            <th className="text-right p-3 font-medium w-1/5">Estimated</th>
+            <th className="text-right p-3 font-medium w-1/5">Actual</th>
+            <th className="text-right p-3 font-medium w-1/5">Difference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const diff = item.actualCost > 0 ? item.estimatedCost - item.actualCost : 0;
+            return (
+              <tr
+                key={item.id}
+                className="border-b hover:bg-muted/30 cursor-pointer"
+                onClick={() => onEdit(item.id === editingId ? null : item.id)}
+              >
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <span>{item.name}</span>
+                    {item.link && (
+                      <a
+                        href={item.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-blue-600 hover:text-blue-800 text-xs underline"
+                      >
+                        View
+                      </a>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3 text-right">
+                  {formatCurrency(item.estimatedCost)}
+                </td>
+                <td className="p-3 text-right">
+                  {editingId === item.id ? (
+                    <input
+                      type="number"
+                      value={item.actualCost}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onUpdateActualCost(item, Number(e.target.value));
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="border rounded px-2 py-1 text-sm w-24 text-right"
+                      min={0}
+                    />
+                  ) : item.actualCost > 0 ? (
+                    `$${item.actualCost.toLocaleString()}`
+                  ) : (
+                    <span className="text-muted-foreground">--</span>
+                  )}
+                </td>
+                <td className={`p-3 text-right ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                  {item.actualCost > 0
+                    ? `${diff >= 0 ? "+" : ""}$${diff.toLocaleString()}`
+                    : "--"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="bg-muted/30 font-medium">
+            <td className="p-3">{category} Subtotal</td>
+            <td className="p-3 text-right">{formatCurrency(subtotal)}</td>
+            <td className="p-3 text-right">
+              {actualSubtotal > 0 ? `$${actualSubtotal.toLocaleString()}` : "--"}
+            </td>
+            <td className="p-3 text-right">
+              {actualSubtotal > 0
+                ? `${subtotal - actualSubtotal >= 0 ? "+" : ""}$${(subtotal - actualSubtotal).toLocaleString()}`
+                : "--"}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
 
 export default function BudgetPage() {
-  const { activeScenarioId, scenarios, addBudgetItem, updateBudgetItem, removeBudgetItem, saveScenario } = useAppStore();
-  const scenario = scenarios.find((s) => s.id === activeScenarioId);
+  const { budgetData, loadBudgets, saveBudgets, updateBudgetDataItem } = useAppStore();
+  const [activeTab, setActiveTab] = useState<BudgetTab>("renovation");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const items = useMemo(() => scenario?.budgetItems || [], [scenario?.budgetItems]);
+  useEffect(() => {
+    loadBudgets();
+  }, [loadBudgets]);
 
-  const total = useMemo(() => items.reduce((sum, item) => sum + item.subtotal, 0), [items]);
+  const renovationItems = budgetData.renovation;
+  const furnitureItems = budgetData.furniture;
 
-  const categoryTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    items.forEach((item) => {
-      totals[item.category] = (totals[item.category] || 0) + item.subtotal;
-    });
-    return totals;
-  }, [items]);
+  const renovationTotal = useMemo(
+    () => renovationItems.reduce((sum, item) => sum + item.estimatedCost, 0),
+    [renovationItems]
+  );
 
-  const handleAddDefaults = useCallback(() => {
-    DEFAULT_ITEMS.forEach((item) => {
-      addBudgetItem({ ...item, id: uuidv4() });
-    });
-  }, [addBudgetItem]);
+  const furnitureTotal = useMemo(
+    () => furnitureItems.reduce((sum, item) => sum + item.estimatedCost, 0),
+    [furnitureItems]
+  );
 
-  const handleAddItem = useCallback(() => {
-    addBudgetItem({
-      id: uuidv4(),
-      category: DEFAULT_CATEGORIES[0],
-      description: "",
-      quantity: 1,
-      unit: "each",
-      unitCost: 0,
-      subtotal: 0,
-    });
-  }, [addBudgetItem]);
+  const renovationActualTotal = useMemo(
+    () => renovationItems.reduce((sum, item) => sum + item.actualCost, 0),
+    [renovationItems]
+  );
 
-  const handleUpdateField = (item: BudgetLineItem, field: keyof BudgetLineItem, value: string | number) => {
-    const updated = { ...item, [field]: value };
-    if (field === "quantity" || field === "unitCost") {
-      updated.subtotal = Number(updated.quantity) * Number(updated.unitCost);
-    }
-    updateBudgetItem(updated);
+  const furnitureActualTotal = useMemo(
+    () => furnitureItems.reduce((sum, item) => sum + item.actualCost, 0),
+    [furnitureItems]
+  );
+
+  const combinedTotal = renovationTotal + furnitureTotal;
+  const combinedActualTotal = renovationActualTotal + furnitureActualTotal;
+
+  const renovationGroups = useMemo(() => groupByCategory(renovationItems), [renovationItems]);
+  const furnitureGroups = useMemo(() => groupByCategory(furnitureItems), [furnitureItems]);
+
+  const handleUpdateActualCost = (item: BudgetItem, value: number) => {
+    updateBudgetDataItem({ ...item, actualCost: value });
   };
 
   const handleSave = async () => {
-    if (scenario) await saveScenario(scenario);
+    setSaving(true);
+    try {
+      await saveBudgets();
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleExport = () => {
-    if (!scenario) return;
-    const json = exportScenarioJSON(scenario);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${scenario.name.replace(/\s+/g, "-").toLowerCase()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleShare = () => {
-    if (!activeScenarioId) return;
-    const url = generateShareUrl(activeScenarioId);
-    setShareUrl(url);
-    navigator.clipboard.writeText(url).catch(() => {});
-  };
-
-  if (!scenario) {
-    return (
-      <div className="text-center py-20 text-muted-foreground">
-        Create a scenario first using the header controls.
-      </div>
-    );
-  }
+  const showRenovation = activeTab === "renovation" || activeTab === "all";
+  const showFurniture = activeTab === "furniture" || activeTab === "all";
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Budget Tracker</h2>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="border rounded-lg p-4">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Renovation Budget</div>
+          <div className="text-2xl font-bold mt-1">${renovationTotal.toLocaleString()}</div>
+          {renovationActualTotal > 0 && (
+            <div className="text-xs text-muted-foreground mt-1">
+              Actual: ${renovationActualTotal.toLocaleString()}
+            </div>
+          )}
+        </div>
+        <div className="border rounded-lg p-4">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Furniture Budget</div>
+          <div className="text-2xl font-bold mt-1">${furnitureTotal.toLocaleString()}</div>
+          {furnitureActualTotal > 0 && (
+            <div className="text-xs text-muted-foreground mt-1">
+              Actual: ${furnitureActualTotal.toLocaleString()}
+            </div>
+          )}
+        </div>
+        <div className="border rounded-lg p-4 bg-primary/5">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Combined Total</div>
+          <div className="text-2xl font-bold mt-1">${combinedTotal.toLocaleString()}</div>
+          {combinedActualTotal > 0 && (
+            <div className="text-xs text-muted-foreground mt-1">
+              Actual: ${combinedActualTotal.toLocaleString()}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex border-b">
+        {(["renovation", "furniture", "all"] as BudgetTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50"
+            }`}
+          >
+            {tab === "renovation" ? "Renovation Budget" : tab === "furniture" ? "Furniture Budget" : "All"}
+          </button>
+        ))}
+      </div>
+
       {/* Disclaimer */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-sm text-yellow-800 font-medium">
-          These estimates are approximate and not final. Actual costs require contractor quotes.
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <p className="text-sm text-yellow-800">
+          Estimates are approximate. Click any row to enter actual costs as purchases are made.
         </p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Budget Estimation</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleExport}
-            className="px-3 py-1.5 text-sm border rounded-md hover:bg-accent"
-          >
-            Export JSON
-          </button>
-          <button
-            onClick={handleShare}
-            className="px-3 py-1.5 text-sm border rounded-md hover:bg-accent"
-          >
-            Share Link
-          </button>
-        </div>
-      </div>
-
-      {shareUrl && (
-        <div className="p-3 bg-primary/5 border border-primary/20 rounded-md text-sm flex items-center justify-between">
-          <span className="truncate">{shareUrl}</span>
-          <button
-            onClick={() => setShareUrl(null)}
-            className="ml-2 text-muted-foreground hover:text-foreground"
-          >
-            Dismiss
-          </button>
+      {/* Renovation Section */}
+      {showRenovation && (
+        <div>
+          {activeTab === "all" && (
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              Renovation Budget
+              <span className="text-sm font-normal text-muted-foreground">
+                (${renovationTotal.toLocaleString()})
+              </span>
+            </h3>
+          )}
+          {Object.entries(renovationGroups).map(([category, items]) => (
+            <CategoryTable
+              key={category}
+              category={category}
+              items={items}
+              editingId={editingId}
+              onEdit={setEditingId}
+              onUpdateActualCost={handleUpdateActualCost}
+            />
+          ))}
+          {activeTab === "renovation" && (
+            <div className="border rounded-lg p-4 bg-muted/50 font-bold flex justify-between">
+              <span>Renovation Grand Total</span>
+              <span>${renovationTotal.toLocaleString()}</span>
+            </div>
+          )}
         </div>
       )}
 
-      {items.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg">
-          <p className="text-muted-foreground mb-4">No budget items yet.</p>
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={handleAddDefaults}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
-            >
-              Load Default Estimates
-            </button>
-            <button
-              onClick={handleAddItem}
-              className="px-4 py-2 border rounded-md text-sm hover:bg-accent"
-            >
-              Add Empty Item
-            </button>
-          </div>
+      {/* Furniture Section */}
+      {showFurniture && (
+        <div>
+          {activeTab === "all" && (
+            <h3 className="text-lg font-semibold mb-3 mt-6 flex items-center gap-2">
+              Furniture Budget
+              <span className="text-sm font-normal text-muted-foreground">
+                (${furnitureTotal.toLocaleString()})
+              </span>
+            </h3>
+          )}
+          {Object.entries(furnitureGroups).map(([category, items]) => (
+            <CategoryTable
+              key={category}
+              category={category}
+              items={items}
+              editingId={editingId}
+              onEdit={setEditingId}
+              onUpdateActualCost={handleUpdateActualCost}
+            />
+          ))}
+          {activeTab === "furniture" && (
+            <div className="border rounded-lg p-4 bg-muted/50 font-bold flex justify-between">
+              <span>Furniture Grand Total</span>
+              <span>${furnitureTotal.toLocaleString()}</span>
+            </div>
+          )}
         </div>
-      ) : (
-        <>
-          {/* Category Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {Object.entries(categoryTotals).map(([cat, catTotal]) => (
-              <div key={cat} className="border rounded-lg p-3">
-                <div className="text-xs text-muted-foreground">{cat}</div>
-                <div className="text-lg font-semibold">
-                  ${catTotal.toLocaleString()}
-                </div>
-              </div>
-            ))}
-          </div>
+      )}
 
-          {/* Budget Table */}
-          <div className="border rounded-lg overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left p-3 font-medium">Category</th>
-                  <th className="text-left p-3 font-medium">Description</th>
-                  <th className="text-right p-3 font-medium">Qty</th>
-                  <th className="text-left p-3 font-medium">Unit</th>
-                  <th className="text-right p-3 font-medium">Unit Cost</th>
-                  <th className="text-right p-3 font-medium">Subtotal</th>
-                  <th className="p-3 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b hover:bg-muted/30 cursor-pointer"
-                    onClick={() => setEditingId(item.id === editingId ? null : item.id)}
-                  >
-                    <td className="p-3">
-                      {editingId === item.id ? (
-                        <select
-                          value={item.category}
-                          onChange={(e) => handleUpdateField(item, "category", e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="border rounded px-2 py-1 text-sm w-full"
-                        >
-                          {DEFAULT_CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs px-2 py-1 bg-muted rounded">{item.category}</span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {editingId === item.id ? (
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => handleUpdateField(item, "description", e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="border rounded px-2 py-1 text-sm w-full"
-                        />
-                      ) : (
-                        item.description || <span className="text-muted-foreground italic">No description</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right">
-                      {editingId === item.id ? (
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleUpdateField(item, "quantity", Number(e.target.value))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="border rounded px-2 py-1 text-sm w-20 text-right"
-                        />
-                      ) : (
-                        item.quantity.toLocaleString()
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {editingId === item.id ? (
-                        <input
-                          type="text"
-                          value={item.unit}
-                          onChange={(e) => handleUpdateField(item, "unit", e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="border rounded px-2 py-1 text-sm w-20"
-                        />
-                      ) : (
-                        item.unit
-                      )}
-                    </td>
-                    <td className="p-3 text-right">
-                      {editingId === item.id ? (
-                        <input
-                          type="number"
-                          value={item.unitCost}
-                          onChange={(e) => handleUpdateField(item, "unitCost", Number(e.target.value))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="border rounded px-2 py-1 text-sm w-24 text-right"
-                        />
-                      ) : (
-                        `$${item.unitCost.toLocaleString()}`
-                      )}
-                    </td>
-                    <td className="p-3 text-right font-medium">
-                      ${item.subtotal.toLocaleString()}
-                    </td>
-                    <td className="p-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeBudgetItem(item.id);
-                        }}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-muted/50 font-bold">
-                  <td colSpan={5} className="p-3 text-right">Total Estimated Cost</td>
-                  <td className="p-3 text-right text-lg">${total.toLocaleString()}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <button
-            onClick={handleAddItem}
-            className="px-4 py-2 border rounded-md text-sm hover:bg-accent"
-          >
-            + Add Line Item
-          </button>
-        </>
+      {/* Combined Total (All tab) */}
+      {activeTab === "all" && (
+        <div className="border-2 border-primary/30 rounded-lg p-4 bg-primary/5 font-bold flex justify-between text-lg">
+          <span>Combined Grand Total</span>
+          <span>${combinedTotal.toLocaleString()}</span>
+        </div>
       )}
     </div>
   );

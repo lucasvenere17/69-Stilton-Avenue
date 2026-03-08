@@ -82,6 +82,21 @@ export interface BudgetLineItem {
   subtotal: number;
 }
 
+export interface BudgetItem {
+  id: string;
+  category: string;
+  name: string;
+  estimatedCost: number;
+  actualCost: number;
+  budgetType: "renovation" | "furniture";
+  link?: string;
+}
+
+export interface BudgetsData {
+  renovation: BudgetItem[];
+  furniture: BudgetItem[];
+}
+
 // Project Tracker Types
 export type ProjectStatus =
   | "not_started"
@@ -146,6 +161,7 @@ export interface RenovationProject {
   budgetItemIds: string[];
   communications: ProjectCommunication[];
   notes: string;
+  estimatedCost?: number;
   createdAt: string;
   updatedAt: string;
   dependsOn: string[];

@@ -2,6 +2,8 @@ import { create } from "zustand";
 import type {
   Scenario,
   BudgetLineItem,
+  BudgetItem,
+  BudgetsData,
   RenovationProject,
   Contractor,
 } from "./types";
@@ -25,6 +27,14 @@ interface AppState {
   // Photos
   selectedPhoto: string | null;
   setSelectedPhoto: (photo: string | null) => void;
+
+  // Budgets (renovation + furniture line items)
+  budgetData: BudgetsData;
+  loadBudgets: () => Promise<void>;
+  saveBudgets: () => Promise<void>;
+  updateBudgetDataItem: (item: BudgetItem) => void;
+  addBudgetDataItem: (item: BudgetItem) => void;
+  removeBudgetDataItem: (id: string) => void;
 
   // Projects
   projects: RenovationProject[];
@@ -157,6 +167,61 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSelectedPhoto: (photo) => set({ selectedPhoto: photo }),
+
+  // Budgets
+  budgetData: { renovation: [], furniture: [] },
+
+  loadBudgets: async () => {
+    try {
+      const res = await fetch("/api/budgets");
+      const data = await res.json();
+      set({ budgetData: { renovation: data.renovation || [], furniture: data.furniture || [] } });
+    } catch {
+      console.error("Failed to load budgets");
+    }
+  },
+
+  saveBudgets: async () => {
+    const { budgetData } = get();
+    await fetch("/api/budgets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "bulk", renovation: budgetData.renovation, furniture: budgetData.furniture }),
+    });
+  },
+
+  updateBudgetDataItem: (item) => {
+    set((s) => {
+      const key = item.budgetType === "renovation" ? "renovation" : "furniture";
+      return {
+        budgetData: {
+          ...s.budgetData,
+          [key]: s.budgetData[key].map((b) => (b.id === item.id ? item : b)),
+        },
+      };
+    });
+  },
+
+  addBudgetDataItem: (item) => {
+    set((s) => {
+      const key = item.budgetType === "renovation" ? "renovation" : "furniture";
+      return {
+        budgetData: {
+          ...s.budgetData,
+          [key]: [...s.budgetData[key], item],
+        },
+      };
+    });
+  },
+
+  removeBudgetDataItem: (id) => {
+    set((s) => ({
+      budgetData: {
+        renovation: s.budgetData.renovation.filter((b) => b.id !== id),
+        furniture: s.budgetData.furniture.filter((b) => b.id !== id),
+      },
+    }));
+  },
 
   // Projects
   projects: [],

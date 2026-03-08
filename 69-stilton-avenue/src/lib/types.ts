@@ -116,6 +116,21 @@ export interface Contractor {
   phone: string;
   trade: string;
   notes: string;
+  website?: string;
+  rating?: number;
+}
+
+export interface EmailDraft {
+  id: string;
+  projectId: string;
+  contractorId?: string;
+  to: string;
+  subject: string;
+  body: string;
+  template?: string;
+  status: "draft" | "sent";
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProjectQuote {

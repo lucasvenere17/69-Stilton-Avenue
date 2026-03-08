@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type {
   RenovationProject,
@@ -36,6 +37,10 @@ import {
   Loader2,
   GripVertical,
   Pencil,
+  Search,
+  Star,
+  Globe,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -900,26 +905,51 @@ function ContractorsTab({
   contractors: Contractor[];
   onEditContractor: (c: Contractor) => void;
 }) {
+  const router = useRouter();
+  const [findModalOpen, setFindModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const assignedContractors = contractors.filter((c) =>
     project.contractorIds.includes(c.id)
   );
 
+  const handleDraftOutreach = (contractorId: string) => {
+    router.push(`/communications?projectId=${project.id}&contractorId=${contractorId}`);
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex gap-2">
+        <button
+          onClick={() => setFindModalOpen(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition font-medium"
+        >
+          <Search className="w-3.5 h-3.5" />
+          Find Contractors
+        </button>
+      </div>
+
       {assignedContractors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No contractors assigned. Edit the project to assign contractors.</p>
+        <p className="text-sm text-muted-foreground">No contractors assigned. Edit the project to assign contractors, or use Find Contractors above.</p>
       ) : (
         <div className="space-y-2">
           {assignedContractors.map((c) => (
             <div
               key={c.id}
-              className="flex items-center gap-3 p-3 border rounded-lg text-sm cursor-pointer hover:bg-accent/50 transition"
-              onClick={() => onEditContractor(c)}
+              className="flex items-center gap-3 p-3 border rounded-lg text-sm"
             >
               <User className="w-4 h-4 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
+              <div
+                className="flex-1 min-w-0 cursor-pointer hover:text-primary transition"
+                onClick={() => onEditContractor(c)}
+              >
                 <span className="font-medium">{c.name}</span>
                 {c.company && <span className="text-muted-foreground"> - {c.company}</span>}
+                {c.rating && (
+                  <span className="ml-2 text-yellow-500 inline-flex items-center gap-0.5">
+                    <Star className="w-3 h-3 fill-current" /> {c.rating}
+                  </span>
+                )}
               </div>
               <span className="text-xs text-muted-foreground">{c.trade}</span>
               {c.phone && (
@@ -927,10 +957,85 @@ function ContractorsTab({
                   <Phone className="w-3 h-3" /> {c.phone}
                 </span>
               )}
+              {c.website && (
+                <a
+                  href={c.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Globe className="w-3 h-3" />
+                </a>
+              )}
+              <button
+                onClick={() => handleDraftOutreach(c.id)}
+                className="text-xs px-2 py-1 border rounded hover:bg-accent transition flex items-center gap-1"
+              >
+                <Send className="w-3 h-3" />
+                Draft Outreach
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      {/* Find Contractors Modal */}
+      <Dialog.Root open={findModalOpen} onOpenChange={setFindModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-full max-w-lg z-50 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <Dialog.Title className="text-lg font-semibold">Find Contractors</Dialog.Title>
+              <Dialog.Close className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </Dialog.Close>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for contractors by trade, name, or location..."
+                  className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                />
+                <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90 transition">
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-center py-8 border rounded-lg bg-gray-50">
+                <Search className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm font-medium text-muted-foreground">AI contractor search coming soon</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use the search above to manually find contractors, or add them from the main contractors list.
+                </p>
+              </div>
+
+              {/* Recommended Contractors Section */}
+              {assignedContractors.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Currently Assigned</h4>
+                  <div className="space-y-2">
+                    {assignedContractors.map((c) => (
+                      <div key={c.id} className="flex items-center gap-3 p-3 border rounded-lg text-sm">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex-1">
+                          <span className="font-medium">{c.name}</span>
+                          {c.company && <span className="text-muted-foreground"> - {c.company}</span>}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{c.trade}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

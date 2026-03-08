@@ -6,6 +6,8 @@ import type {
   BudgetsData,
   RenovationProject,
   Contractor,
+  EmailDraft,
+  ProjectCommunication,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -48,6 +50,14 @@ interface AppState {
   updateContractor: (contractor: Contractor) => Promise<void>;
   deleteContractor: (id: string) => Promise<void>;
   updateProjectStatus: (id: string, status: RenovationProject["status"]) => Promise<void>;
+
+  // Communications
+  drafts: EmailDraft[];
+  getAllCommunications: () => (ProjectCommunication & { projectId: string; projectName: string })[];
+  addDraft: (draft: EmailDraft) => void;
+  updateDraft: (draft: EmailDraft) => void;
+  deleteDraft: (id: string) => void;
+  sendDraft: (draft: EmailDraft) => Promise<void>;
 }
 
 const createEmptyScenario = (name: string): Scenario => ({
@@ -317,5 +327,56 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       projects: s.projects.map((p) => (p.id === id ? updated : p)),
     }));
+  },
+
+  // Communications
+  drafts: [],
+
+  getAllCommunications: () => {
+    const { projects } = get();
+    const allComms: (ProjectCommunication & { projectId: string; projectName: string })[] = [];
+    for (const project of projects) {
+      for (const comm of project.communications) {
+        allComms.push({ ...comm, projectId: project.id, projectName: project.name });
+      }
+    }
+    allComms.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return allComms;
+  },
+
+  addDraft: (draft) => {
+    set((s) => ({ drafts: [...s.drafts, draft] }));
+  },
+
+  updateDraft: (draft) => {
+    set((s) => ({
+      drafts: s.drafts.map((d) => (d.id === draft.id ? { ...draft, updatedAt: new Date().toISOString() } : d)),
+    }));
+  },
+
+  deleteDraft: (id) => {
+    set((s) => ({ drafts: s.drafts.filter((d) => d.id !== id) }));
+  },
+
+  sendDraft: async (draft) => {
+    const { projects, updateProject } = get();
+    const project = projects.find((p) => p.id === draft.projectId);
+    if (!project) return;
+
+    const comm: ProjectCommunication = {
+      id: uuidv4(),
+      date: new Date().toISOString(),
+      type: "email",
+      summary: `Email to ${draft.to}: ${draft.subject}`,
+      contractorId: draft.contractorId,
+    };
+
+    await updateProject({
+      ...project,
+      communications: [...project.communications, comm],
+    });
+
+    // Mark draft as sent and remove from drafts
+    set((s) => ({ drafts: s.drafts.filter((d) => d.id !== draft.id) }));
   },
 }));

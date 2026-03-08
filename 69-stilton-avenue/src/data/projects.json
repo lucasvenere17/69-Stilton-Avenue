@@ -14,11 +14,12 @@
           "title": "Cabinet Resurfacing",
           "description": "Resurface existing kitchen cabinets",
           "status": "not_started",
-          "estimatedCost": 3500,
+          "estimatedCost": 3501,
           "actualCost": 0,
+          "budgetItemId": "5691fb94-a74f-48b8-9b12-64facf8e343f",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
-          "updatedAt": "2026-03-08T20:51:08.569Z"
+          "updatedAt": "2026-03-08T22:12:08.910Z"
         },
         {
           "id": "st-k2-island-counter-backsplash",
@@ -27,6 +28,7 @@
           "status": "not_started",
           "estimatedCost": 8000,
           "actualCost": 0,
+          "budgetItemId": "97f070cc-0d9d-440d-8693-54e89971ad9d",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -38,6 +40,7 @@
           "status": "not_started",
           "estimatedCost": 1500,
           "actualCost": 0,
+          "budgetItemId": "75bfa09c-479a-4338-befb-ceb1c3ff461b",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -51,7 +54,7 @@
       "notes": "",
       "estimatedCost": 13000,
       "createdAt": "2026-03-08T20:51:08.569Z",
-      "updatedAt": "2026-03-08T20:51:08.569Z",
+      "updatedAt": "2026-03-08T22:12:08.910Z",
       "dependsOn": []
     },
     {
@@ -70,6 +73,7 @@
           "status": "not_started",
           "estimatedCost": 3000,
           "actualCost": 0,
+          "budgetItemId": "a80a9bca-f189-4c9d-a03c-9cf0f7aed651",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -102,6 +106,7 @@
           "status": "not_started",
           "estimatedCost": 12000,
           "actualCost": 0,
+          "budgetItemId": "1df53d45-c0e3-4f36-9d24-cb76b5cba074",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -113,6 +118,7 @@
           "status": "not_started",
           "estimatedCost": 700,
           "actualCost": 0,
+          "budgetItemId": "f2f81a4d-6d91-4bc3-9cb7-6fd1737543a6",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -145,6 +151,7 @@
           "status": "not_started",
           "estimatedCost": 1500,
           "actualCost": 0,
+          "budgetItemId": "3030f9b1-9d12-4332-ae78-477346e4204f",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -156,6 +163,7 @@
           "status": "not_started",
           "estimatedCost": 7000,
           "actualCost": 0,
+          "budgetItemId": "8da61cca-9af0-4a3b-80e2-9de29459c690",
           "notes": "Includes taping & sanding",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -167,6 +175,7 @@
           "status": "not_started",
           "estimatedCost": 4500,
           "actualCost": 0,
+          "budgetItemId": "2442082c-945b-4fe6-9165-fb3b09baaa25",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -178,6 +187,7 @@
           "status": "not_started",
           "estimatedCost": 2000,
           "actualCost": 0,
+          "budgetItemId": "8a52d1a1-594b-46ed-bd50-ed13dd2949eb",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -189,6 +199,7 @@
           "status": "not_started",
           "estimatedCost": 0,
           "actualCost": 0,
+          "budgetItemId": "b0709b99-1b71-4161-8779-e095164cf5b3",
           "notes": "Cost TBD",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -221,6 +232,7 @@
           "status": "not_started",
           "estimatedCost": 3000,
           "actualCost": 0,
+          "budgetItemId": "06607b56-5e8c-4032-956d-6499f6649bff",
           "link": "https://www.wayfair.ca/home-improvement/pdp/mercer41-96-freestanding-double-sink-bathroom-vanity-with-sink-top-24-makeup-countertop-with-drawer-bathroom-cabinet-shelf-with-drawers-and-doors-c117448195.html?piid=1912389666",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
@@ -233,6 +245,7 @@
           "status": "not_started",
           "estimatedCost": 560,
           "actualCost": 0,
+          "budgetItemId": "2d6f2201-241c-4273-92a7-875872e8e9d5",
           "link": "https://www.homedepot.ca/product/wellfor-st1-12-inch-wall-mounted-2-spray-hand-shower-and-shower-head-combo-kit-in-matte-black/1001899898",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
@@ -266,6 +279,7 @@
           "status": "not_started",
           "estimatedCost": 3000,
           "actualCost": 0,
+          "budgetItemId": "a65211b7-6944-4796-a0e2-9d731e97f3fe",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -298,6 +312,7 @@
           "status": "not_started",
           "estimatedCost": 3000,
           "actualCost": 0,
+          "budgetItemId": "6aaf9756-bce3-4a4c-82fe-e50ec411c7f8",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"
@@ -330,6 +345,7 @@
           "status": "not_started",
           "estimatedCost": 0,
           "actualCost": 0,
+          "budgetItemId": "685f5bfa-aea9-4da8-9ca0-8ca7125f0547",
           "notes": "Cost TBD",
           "createdAt": "2026-03-08T20:51:08.569Z",
           "updatedAt": "2026-03-08T20:51:08.569Z"

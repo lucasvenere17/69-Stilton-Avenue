@@ -38,6 +38,15 @@ interface AppState {
   addBudgetDataItem: (item: BudgetItem) => void;
   removeBudgetDataItem: (id: string) => void;
 
+  // Budget-Project sync
+  updateSubTaskCost: (projectId: string, subTaskId: string, field: "estimatedCost" | "actualCost", value: number) => Promise<void>;
+  updateBudgetItemCost: (budgetItemId: string, field: "estimatedCost" | "actualCost", value: number) => Promise<void>;
+  acceptQuoteAndSyncBudget: (projectId: string, quoteId: string) => Promise<void>;
+
+  // Toast
+  toastMessage: string | null;
+  setToastMessage: (msg: string | null) => void;
+
   // Projects
   projects: RenovationProject[];
   contractors: Contractor[];
@@ -177,6 +186,185 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSelectedPhoto: (photo) => set({ selectedPhoto: photo }),
+
+  // Toast
+  toastMessage: null,
+  setToastMessage: (msg) => set({ toastMessage: msg }),
+
+  // Budget-Project sync
+  updateSubTaskCost: async (projectId, subTaskId, field, value) => {
+    const { projects, budgetData } = get();
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const subTask = project.subTasks.find((st) => st.id === subTaskId);
+    if (!subTask) return;
+
+    // Update the sub-task
+    const updatedSubTask = { ...subTask, [field]: value, updatedAt: new Date().toISOString() };
+    const updatedProject = {
+      ...project,
+      subTasks: project.subTasks.map((st) => (st.id === subTaskId ? updatedSubTask : st)),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update in store and persist projects
+    set((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? updatedProject : p)),
+    }));
+    await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", project: updatedProject }),
+    });
+
+    // Sync to linked budget item
+    if (subTask.budgetItemId) {
+      const allItems = [...budgetData.renovation, ...budgetData.furniture];
+      const budgetItem = allItems.find((b) => b.id === subTask.budgetItemId);
+      if (budgetItem) {
+        const updatedBudgetItem = { ...budgetItem, [field]: value };
+        const key = budgetItem.budgetType === "renovation" ? "renovation" : "furniture";
+        const newBudgetData = {
+          ...budgetData,
+          [key]: budgetData[key].map((b) => (b.id === budgetItem.id ? updatedBudgetItem : b)),
+        };
+        set({ budgetData: newBudgetData });
+        await fetch("/api/budgets", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "bulk", renovation: newBudgetData.renovation, furniture: newBudgetData.furniture }),
+        });
+      }
+    }
+  },
+
+  updateBudgetItemCost: async (budgetItemId, field, value) => {
+    const { budgetData, projects } = get();
+    const allItems = [...budgetData.renovation, ...budgetData.furniture];
+    const budgetItem = allItems.find((b) => b.id === budgetItemId);
+    if (!budgetItem) return;
+
+    // Update the budget item
+    const updatedBudgetItem = { ...budgetItem, [field]: value };
+    const key = budgetItem.budgetType === "renovation" ? "renovation" : "furniture";
+    const newBudgetData = {
+      ...budgetData,
+      [key]: budgetData[key].map((b) => (b.id === budgetItemId ? updatedBudgetItem : b)),
+    };
+    set({ budgetData: newBudgetData });
+    await fetch("/api/budgets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "bulk", renovation: newBudgetData.renovation, furniture: newBudgetData.furniture }),
+    });
+
+    // Sync to linked sub-task
+    if (budgetItem.subTaskId && budgetItem.projectId) {
+      const project = projects.find((p) => p.id === budgetItem.projectId);
+      if (project) {
+        const updatedProject = {
+          ...project,
+          subTasks: project.subTasks.map((st) =>
+            st.id === budgetItem.subTaskId
+              ? { ...st, [field]: value, updatedAt: new Date().toISOString() }
+              : st
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+        set((s) => ({
+          projects: s.projects.map((p) => (p.id === budgetItem.projectId ? updatedProject : p)),
+        }));
+        await fetch("/api/projects", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "project", project: updatedProject }),
+        });
+      }
+    }
+  },
+
+  acceptQuoteAndSyncBudget: async (projectId, quoteId) => {
+    const { projects, budgetData, contractors } = get();
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const quote = project.quotes.find((q) => q.id === quoteId);
+    if (!quote) return;
+
+    const contractor = contractors.find((c) => c.id === quote.contractorId);
+    const contractorName = contractor?.name || "Unknown";
+
+    // Accept the quote on the project
+    const updatedProject = {
+      ...project,
+      acceptedQuoteId: quoteId,
+      quotes: project.quotes.map((q) => ({ ...q, accepted: q.id === quoteId })),
+      updatedAt: new Date().toISOString(),
+    };
+
+    set((s) => ({
+      projects: s.projects.map((p) => (p.id === projectId ? updatedProject : p)),
+    }));
+    await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", project: updatedProject }),
+    });
+
+    // Distribute quote amount across linked budget items proportionally
+    const linkedSubTasks = project.subTasks.filter((st) => st.budgetItemId);
+    if (linkedSubTasks.length > 0) {
+      const totalEstimated = linkedSubTasks.reduce((sum, st) => sum + st.estimatedCost, 0);
+      const newBudgetData = { ...budgetData };
+
+      for (const st of linkedSubTasks) {
+        if (!st.budgetItemId) continue;
+        // Proportional share of the quote
+        const share = totalEstimated > 0
+          ? Math.round((st.estimatedCost / totalEstimated) * quote.amount)
+          : Math.round(quote.amount / linkedSubTasks.length);
+
+        const key: "renovation" | "furniture" = "renovation"; // renovation budget items are linked
+        newBudgetData[key] = newBudgetData[key].map((b) =>
+          b.id === st.budgetItemId
+            ? { ...b, actualCost: share, acceptedQuoteContractor: contractorName, acceptedQuoteAmount: quote.amount }
+            : b
+        );
+      }
+
+      // Also update sub-task actual costs proportionally
+      const updatedProjectWithCosts = {
+        ...updatedProject,
+        subTasks: updatedProject.subTasks.map((st) => {
+          if (!st.budgetItemId || !linkedSubTasks.find((ls) => ls.id === st.id)) return st;
+          const share = totalEstimated > 0
+            ? Math.round((st.estimatedCost / totalEstimated) * quote.amount)
+            : Math.round(quote.amount / linkedSubTasks.length);
+          return { ...st, actualCost: share, updatedAt: new Date().toISOString() };
+        }),
+      };
+
+      set((s) => ({
+        budgetData: newBudgetData,
+        projects: s.projects.map((p) => (p.id === projectId ? updatedProjectWithCosts : p)),
+      }));
+
+      await fetch("/api/budgets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "bulk", renovation: newBudgetData.renovation, furniture: newBudgetData.furniture }),
+      });
+      await fetch("/api/projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "project", project: updatedProjectWithCosts }),
+      });
+
+      set({ toastMessage: `Quote accepted! Budget updated with ${contractorName}'s quote of $${quote.amount.toLocaleString()}.` });
+      setTimeout(() => set({ toastMessage: null }), 5000);
+    }
+  },
 
   // Budgets
   budgetData: { renovation: [], furniture: [] },

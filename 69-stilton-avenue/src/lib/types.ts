@@ -90,6 +90,10 @@ export interface BudgetItem {
   actualCost: number;
   budgetType: "renovation" | "furniture";
   link?: string;
+  subTaskId?: string;
+  projectId?: string;
+  acceptedQuoteContractor?: string;
+  acceptedQuoteAmount?: number;
 }
 
 export interface BudgetsData {
@@ -169,6 +173,7 @@ export interface SubTask {
   estimatedCost: number;
   actualCost: number;
   assignedContractorId?: string;
+  budgetItemId?: string;
   link?: string;
   notes: string;
   createdAt: string;

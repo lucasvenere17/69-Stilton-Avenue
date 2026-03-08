@@ -41,6 +41,7 @@ import {
   Star,
   Globe,
   Send,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -390,7 +391,8 @@ export default function ProjectsPage() {
     projects, contractors, loadProjects,
     addProject, updateProject, deleteProject,
     addContractor, updateContractor, deleteContractor,
-    updateProjectStatus,
+    updateProjectStatus, loadBudgets,
+    toastMessage, setToastMessage,
   } = useAppStore();
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -401,7 +403,8 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+    loadBudgets();
+  }, [loadProjects, loadBudgets]);
 
   const notStarted = projects.filter((p) => p.status === "not_started").length;
   const inProgress = projects.filter((p) =>
@@ -432,6 +435,20 @@ export default function ProjectsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-sm">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <p className="text-sm">{toastMessage}</p>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-white/80 hover:text-white shrink-0 ml-2"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="flex items-center gap-3 p-4 bg-white border rounded-lg">
@@ -899,6 +916,7 @@ function SubTasksTab({
                   contractors={contractors}
                   onUpdate={updateSubTask}
                   onDelete={() => deleteSubTask(st.id)}
+                  projectId={project.id}
                 />
               )}
             </div>
@@ -966,14 +984,24 @@ function SubTaskDetail({
   contractors,
   onUpdate,
   onDelete,
+  projectId,
 }: {
   subTask: SubTask;
   contractors: Contractor[];
   onUpdate: (st: SubTask) => void;
   onDelete: () => void;
+  projectId: string;
 }) {
+  const { updateSubTaskCost, projects } = useAppStore();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState("");
+
+  // Find accepted quote info for this project
+  const project = projects.find((p) => p.id === projectId);
+  const acceptedQuote = project?.quotes.find((q) => q.accepted);
+  const acceptedContractor = acceptedQuote
+    ? contractors.find((c) => c.id === acceptedQuote.contractorId)
+    : null;
 
   const startEdit = (field: string, value: string) => {
     setEditingField(field);
@@ -981,18 +1009,41 @@ function SubTaskDetail({
   };
 
   const saveEdit = (field: string) => {
-    const updates: Partial<SubTask> = {};
-    if (field === "description") updates.description = tempValue;
-    if (field === "notes") updates.notes = tempValue;
-    if (field === "estimatedCost") updates.estimatedCost = parseFloat(tempValue) || 0;
-    if (field === "actualCost") updates.actualCost = parseFloat(tempValue) || 0;
-    if (field === "link") updates.link = tempValue || undefined;
-    onUpdate({ ...subTask, ...updates });
+    if (field === "estimatedCost" || field === "actualCost") {
+      // Use syncing version
+      const value = parseFloat(tempValue) || 0;
+      updateSubTaskCost(projectId, subTask.id, field, value);
+    } else {
+      const updates: Partial<SubTask> = {};
+      if (field === "description") updates.description = tempValue;
+      if (field === "notes") updates.notes = tempValue;
+      if (field === "link") updates.link = tempValue || undefined;
+      onUpdate({ ...subTask, ...updates });
+    }
     setEditingField(null);
   };
 
   return (
     <div className="px-10 pb-4 pt-1 bg-accent/10 border-t border-dashed space-y-4">
+      {/* Budget link indicator */}
+      {subTask.budgetItemId && (
+        <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-blue-700">
+          <Link2 className="w-3.5 h-3.5" />
+          <span>Linked to Budget -- cost changes sync automatically</span>
+        </div>
+      )}
+
+      {/* Accepted quote indicator */}
+      {acceptedQuote && (
+        <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-green-700">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>
+            Accepted quote: ${acceptedQuote.amount.toLocaleString()}
+            {acceptedContractor && ` from ${acceptedContractor.name}`}
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Status */}
         <div>
@@ -1502,15 +1553,11 @@ function QuotesTab({
     setShowForm(false);
   };
 
+  const { acceptQuoteAndSyncBudget } = useAppStore();
+
   const acceptQuote = (quoteId: string) => {
-    onUpdate({
-      ...project,
-      acceptedQuoteId: quoteId,
-      quotes: project.quotes.map((q) => ({
-        ...q,
-        accepted: q.id === quoteId,
-      })),
-    });
+    // Use the syncing version that updates budget items
+    acceptQuoteAndSyncBudget(project.id, quoteId);
   };
 
   const deleteQuote = (quoteId: string) => {

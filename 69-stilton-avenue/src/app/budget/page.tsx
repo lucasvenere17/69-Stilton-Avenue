@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type { BudgetItem } from "@/lib/types";
+import { Link2, CheckCircle2 } from "lucide-react";
 
 type BudgetTab = "renovation" | "furniture" | "all";
 
@@ -25,14 +27,17 @@ function CategoryTable({
   items,
   editingId,
   onEdit,
-  onUpdateActualCost,
+  onUpdateCost,
+  projects,
 }: {
   category: string;
   items: BudgetItem[];
   editingId: string | null;
   onEdit: (id: string | null) => void;
-  onUpdateActualCost: (item: BudgetItem, value: number) => void;
+  onUpdateCost: (item: BudgetItem, field: "estimatedCost" | "actualCost", value: number) => void;
+  projects: { id: string; name: string }[];
 }) {
+  const router = useRouter();
   const subtotal = items.reduce((sum, item) => sum + item.estimatedCost, 0);
   const actualSubtotal = items.reduce((sum, item) => sum + item.actualCost, 0);
 
@@ -56,6 +61,10 @@ function CategoryTable({
         <tbody>
           {items.map((item) => {
             const diff = item.actualCost > 0 ? item.estimatedCost - item.actualCost : 0;
+            const linkedProject = item.projectId
+              ? projects.find((p) => p.id === item.projectId)
+              : null;
+
             return (
               <tr
                 key={item.id}
@@ -63,7 +72,7 @@ function CategoryTable({
                 onClick={() => onEdit(item.id === editingId ? null : item.id)}
               >
                 <td className="p-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span>{item.name}</span>
                     {item.link && (
                       <a
@@ -76,10 +85,43 @@ function CategoryTable({
                         View
                       </a>
                     )}
+                    {linkedProject && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/projects?highlight=${item.projectId}`);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                        title={`Linked to: ${linkedProject.name}`}
+                      >
+                        <Link2 className="w-3 h-3" />
+                        {linkedProject.name}
+                      </button>
+                    )}
+                    {item.acceptedQuoteContractor && (
+                      <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-700">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Quote: {item.acceptedQuoteContractor}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="p-3 text-right">
-                  {formatCurrency(item.estimatedCost)}
+                  {editingId === item.id ? (
+                    <input
+                      type="number"
+                      value={item.estimatedCost}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onUpdateCost(item, "estimatedCost", Number(e.target.value));
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="border rounded px-2 py-1 text-sm w-24 text-right"
+                      min={0}
+                    />
+                  ) : (
+                    formatCurrency(item.estimatedCost)
+                  )}
                 </td>
                 <td className="p-3 text-right">
                   {editingId === item.id ? (
@@ -88,7 +130,7 @@ function CategoryTable({
                       value={item.actualCost}
                       onChange={(e) => {
                         e.stopPropagation();
-                        onUpdateActualCost(item, Number(e.target.value));
+                        onUpdateCost(item, "actualCost", Number(e.target.value));
                       }}
                       onClick={(e) => e.stopPropagation()}
                       className="border rounded px-2 py-1 text-sm w-24 text-right"
@@ -129,17 +171,27 @@ function CategoryTable({
 }
 
 export default function BudgetPage() {
-  const { budgetData, loadBudgets, saveBudgets, updateBudgetDataItem } = useAppStore();
+  const {
+    budgetData, loadBudgets, saveBudgets, updateBudgetItemCost,
+    projects, loadProjects,
+    toastMessage, setToastMessage,
+  } = useAppStore();
   const [activeTab, setActiveTab] = useState<BudgetTab>("renovation");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadBudgets();
-  }, [loadBudgets]);
+    loadProjects();
+  }, [loadBudgets, loadProjects]);
 
   const renovationItems = budgetData.renovation;
   const furnitureItems = budgetData.furniture;
+
+  const projectsList = useMemo(
+    () => projects.map((p) => ({ id: p.id, name: p.name })),
+    [projects]
+  );
 
   const renovationTotal = useMemo(
     () => renovationItems.reduce((sum, item) => sum + item.estimatedCost, 0),
@@ -167,8 +219,14 @@ export default function BudgetPage() {
   const renovationGroups = useMemo(() => groupByCategory(renovationItems), [renovationItems]);
   const furnitureGroups = useMemo(() => groupByCategory(furnitureItems), [furnitureItems]);
 
-  const handleUpdateActualCost = (item: BudgetItem, value: number) => {
-    updateBudgetDataItem({ ...item, actualCost: value });
+  const linkedCount = useMemo(
+    () => renovationItems.filter((item) => item.subTaskId).length,
+    [renovationItems]
+  );
+
+  const handleUpdateCost = (item: BudgetItem, field: "estimatedCost" | "actualCost", value: number) => {
+    // Use the syncing version that also updates linked sub-tasks
+    updateBudgetItemCost(item.id, field, value);
   };
 
   const handleSave = async () => {
@@ -185,6 +243,20 @@ export default function BudgetPage() {
 
   return (
     <div className="space-y-6">
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-sm animate-in slide-in-from-top-2">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <p className="text-sm">{toastMessage}</p>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-white/80 hover:text-white shrink-0 ml-2"
+          >
+            x
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Budget Tracker</h2>
@@ -228,6 +300,17 @@ export default function BudgetPage() {
         </div>
       </div>
 
+      {/* Linked items info */}
+      {linkedCount > 0 && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <Link2 className="w-4 h-4 text-blue-600" />
+          <span>
+            <strong className="text-blue-700">{linkedCount}</strong> renovation budget items are linked to project sub-tasks.
+            Cost changes sync automatically.
+          </span>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="flex border-b">
         {(["renovation", "furniture", "all"] as BudgetTab[]).map((tab) => (
@@ -248,7 +331,7 @@ export default function BudgetPage() {
       {/* Disclaimer */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
         <p className="text-sm text-yellow-800">
-          Estimates are approximate. Click any row to enter actual costs as purchases are made.
+          Estimates are approximate. Click any row to edit costs. Linked items sync to their project sub-tasks automatically.
         </p>
       </div>
 
@@ -270,7 +353,8 @@ export default function BudgetPage() {
               items={items}
               editingId={editingId}
               onEdit={setEditingId}
-              onUpdateActualCost={handleUpdateActualCost}
+              onUpdateCost={handleUpdateCost}
+              projects={projectsList}
             />
           ))}
           {activeTab === "renovation" && (
@@ -300,7 +384,8 @@ export default function BudgetPage() {
               items={items}
               editingId={editingId}
               onEdit={setEditingId}
-              onUpdateActualCost={handleUpdateActualCost}
+              onUpdateCost={handleUpdateCost}
+              projects={projectsList}
             />
           ))}
           {activeTab === "furniture" && (

@@ -144,6 +144,22 @@ export interface ProjectCommunication {
   contractorId?: string;
 }
 
+export type SubTaskStatus = "not_started" | "in_progress" | "completed";
+
+export interface SubTask {
+  id: string;
+  title: string;
+  description: string;
+  status: SubTaskStatus;
+  estimatedCost: number;
+  actualCost: number;
+  assignedContractorId?: string;
+  link?: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RenovationProject {
   id: string;
   name: string;
@@ -154,6 +170,7 @@ export interface RenovationProject {
   estimatedEndDate?: string;
   actualStartDate?: string;
   actualEndDate?: string;
+  subTasks: SubTask[];
   milestones: ProjectMilestone[];
   contractorIds: string[];
   quotes: ProjectQuote[];

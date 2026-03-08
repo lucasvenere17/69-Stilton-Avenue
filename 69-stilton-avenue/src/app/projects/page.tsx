@@ -7,8 +7,9 @@ import type {
   Contractor,
   ProjectStatus,
   ProjectQuote,
-  ProjectMilestone,
   ProjectCommunication,
+  SubTask,
+  SubTaskStatus,
 } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -18,6 +19,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   ClipboardCheck,
   Users,
   CheckCircle2,
@@ -29,6 +31,11 @@ import {
   Mail,
   User,
   Trash2,
+  ExternalLink,
+  DollarSign,
+  Loader2,
+  GripVertical,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +54,30 @@ const STATUS_CONFIG: Record<
   completed: { label: "Completed", color: "text-green-700", bg: "bg-green-100" },
 };
 
+const SUBTASK_STATUS_CONFIG: Record<
+  SubTaskStatus,
+  { label: string; icon: React.ReactNode; color: string; bg: string }
+> = {
+  not_started: {
+    label: "To Do",
+    icon: <Circle className="w-4 h-4" />,
+    color: "text-gray-500",
+    bg: "bg-gray-100",
+  },
+  in_progress: {
+    label: "In Progress",
+    icon: <Loader2 className="w-4 h-4" />,
+    color: "text-blue-600",
+    bg: "bg-blue-100",
+  },
+  completed: {
+    label: "Done",
+    icon: <CheckCircle2 className="w-4 h-4" />,
+    color: "text-green-600",
+    bg: "bg-green-100",
+  },
+};
+
 const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
   low: { label: "Low", color: "text-gray-500" },
   medium: { label: "Medium", color: "text-blue-600" },
@@ -58,6 +89,8 @@ const ALL_STATUSES: ProjectStatus[] = [
   "not_started", "getting_quotes", "quoted", "scheduled",
   "in_progress", "inspection_needed", "on_hold", "completed",
 ];
+
+const ALL_SUBTASK_STATUSES: SubTaskStatus[] = ["not_started", "in_progress", "completed"];
 
 // ── Main Page ──
 export default function ProjectsPage() {
@@ -83,6 +116,7 @@ export default function ProjectsPage() {
     ["getting_quotes", "quoted", "scheduled", "in_progress", "inspection_needed"].includes(p.status)
   ).length;
   const completed = projects.filter((p) => p.status === "completed").length;
+  const totalBudget = projects.reduce((sum, p) => sum + (p.estimatedCost || 0), 0);
 
   const openAddProject = () => {
     setEditingProject(null);
@@ -107,7 +141,7 @@ export default function ProjectsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="flex items-center gap-3 p-4 bg-white border rounded-lg">
           <Circle className="w-5 h-5 text-gray-400" />
           <div>
@@ -127,6 +161,13 @@ export default function ProjectsPage() {
           <div>
             <div className="text-2xl font-bold">{completed}</div>
             <div className="text-sm text-muted-foreground">Completed</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-4 bg-white border rounded-lg">
+          <DollarSign className="w-5 h-5 text-emerald-500" />
+          <div>
+            <div className="text-2xl font-bold">${totalBudget.toLocaleString()}</div>
+            <div className="text-sm text-muted-foreground">Total Budget</div>
           </div>
         </div>
       </div>
@@ -158,9 +199,8 @@ export default function ProjectsPage() {
           const assignedContractors = contractors.filter((c) =>
             project.contractorIds.includes(c.id)
           );
-          const completedMilestones = project.milestones.filter(
-            (m) => m.status === "completed"
-          ).length;
+          const subTasks = project.subTasks || [];
+          const completedSubTasks = subTasks.filter((st) => st.status === "completed").length;
 
           return (
             <div key={project.id} className="bg-white border rounded-lg overflow-hidden">
@@ -188,6 +228,18 @@ export default function ProjectsPage() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 flex items-center gap-4">
+                      {subTasks.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {completedSubTasks}/{subTasks.length} tasks
+                        </span>
+                      )}
+                      {project.estimatedCost ? (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" />
+                          ${project.estimatedCost.toLocaleString()}
+                        </span>
+                      ) : null}
                       {assignedContractors.length > 0 && (
                         <span className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
@@ -201,13 +253,18 @@ export default function ProjectsPage() {
                           {project.estimatedEndDate && ` - ${project.estimatedEndDate}`}
                         </span>
                       )}
-                      {project.milestones.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {completedMilestones}/{project.milestones.length} milestones
-                        </span>
-                      )}
                     </div>
+                    {/* Sub-task progress bar */}
+                    {subTasks.length > 0 && (
+                      <div className="mt-2 w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all"
+                          style={{
+                            width: `${(completedSubTasks / subTasks.length) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 {isExpanded ? (
@@ -322,13 +379,13 @@ function ProjectDetail({
         </button>
       </div>
 
-      <Tabs.Root defaultValue="overview">
+      <Tabs.Root defaultValue="subtasks">
         <Tabs.List className="flex border-b mb-4">
           <Tabs.Trigger
-            value="overview"
+            value="subtasks"
             className="px-4 py-2 text-sm font-medium border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground"
           >
-            Overview
+            Sub-Tasks ({(project.subTasks || []).length})
           </Tabs.Trigger>
           <Tabs.Trigger
             value="quotes"
@@ -342,14 +399,19 @@ function ProjectDetail({
           >
             Communications ({project.communications.length})
           </Tabs.Trigger>
+          <Tabs.Trigger
+            value="contractors"
+            className="px-4 py-2 text-sm font-medium border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground"
+          >
+            Contractors
+          </Tabs.Trigger>
         </Tabs.List>
 
-        <Tabs.Content value="overview">
-          <OverviewTab
+        <Tabs.Content value="subtasks">
+          <SubTasksTab
             project={project}
             contractors={contractors}
             onUpdate={onUpdate}
-            onEditContractor={onEditContractor}
           />
         </Tabs.Content>
 
@@ -367,154 +429,508 @@ function ProjectDetail({
             onUpdate={onUpdate}
           />
         </Tabs.Content>
+
+        <Tabs.Content value="contractors">
+          <ContractorsTab
+            project={project}
+            contractors={contractors}
+            onEditContractor={onEditContractor}
+          />
+        </Tabs.Content>
       </Tabs.Root>
     </div>
   );
 }
 
-// ── Overview Tab ──
-function OverviewTab({
+// ── Sub-Tasks Tab (Notion/Asana style) ──
+function SubTasksTab({
   project,
   contractors,
   onUpdate,
-  onEditContractor,
 }: {
   project: RenovationProject;
   contractors: Contractor[];
   onUpdate: (p: RenovationProject) => Promise<void>;
+}) {
+  const [expandedSubTaskId, setExpandedSubTaskId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newEstCost, setNewEstCost] = useState("");
+
+  const subTasks = project.subTasks || [];
+  const completedCount = subTasks.filter((st) => st.status === "completed").length;
+  const totalEstimated = subTasks.reduce((sum, st) => sum + st.estimatedCost, 0);
+  const totalActual = subTasks.reduce((sum, st) => sum + st.actualCost, 0);
+
+  const addSubTask = () => {
+    if (!newTitle.trim()) return;
+    const now = new Date().toISOString();
+    const st: SubTask = {
+      id: uuidv4(),
+      title: newTitle.trim(),
+      description: "",
+      status: "not_started",
+      estimatedCost: parseFloat(newEstCost) || 0,
+      actualCost: 0,
+      notes: "",
+      createdAt: now,
+      updatedAt: now,
+    };
+    onUpdate({
+      ...project,
+      subTasks: [...subTasks, st],
+    });
+    setNewTitle("");
+    setNewEstCost("");
+    setShowAddForm(false);
+  };
+
+  const updateSubTask = (updated: SubTask) => {
+    onUpdate({
+      ...project,
+      subTasks: subTasks.map((st) => (st.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : st)),
+    });
+  };
+
+  const deleteSubTask = (id: string) => {
+    onUpdate({
+      ...project,
+      subTasks: subTasks.filter((st) => st.id !== id),
+    });
+  };
+
+  const cycleStatus = (st: SubTask) => {
+    const order: SubTaskStatus[] = ["not_started", "in_progress", "completed"];
+    const nextIdx = (order.indexOf(st.status) + 1) % order.length;
+    updateSubTask({ ...st, status: order[nextIdx] });
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Summary bar */}
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-4">
+          <span className="text-muted-foreground">
+            {completedCount}/{subTasks.length} completed
+          </span>
+          {subTasks.length > 0 && (
+            <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 rounded-full transition-all"
+                style={{ width: `${(completedCount / subTasks.length) * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-4 text-muted-foreground">
+          <span>Est: ${totalEstimated.toLocaleString()}</span>
+          {totalActual > 0 && <span>Actual: ${totalActual.toLocaleString()}</span>}
+        </div>
+      </div>
+
+      {/* Sub-task list */}
+      <div className="border rounded-lg divide-y">
+        {subTasks.map((st) => {
+          const isExpanded = expandedSubTaskId === st.id;
+          const statusCfg = SUBTASK_STATUS_CONFIG[st.status];
+
+          return (
+            <div key={st.id} className="group">
+              {/* Sub-task row */}
+              <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent/30 transition">
+                <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition shrink-0 cursor-grab" />
+
+                {/* Status toggle button */}
+                <button
+                  onClick={() => cycleStatus(st)}
+                  className={cn("shrink-0 transition", statusCfg.color)}
+                  title={`Status: ${statusCfg.label} (click to change)`}
+                >
+                  {statusCfg.icon}
+                </button>
+
+                {/* Title + expand */}
+                <button
+                  onClick={() => setExpandedSubTaskId(isExpanded ? null : st.id)}
+                  className="flex-1 text-left flex items-center gap-2 min-w-0"
+                >
+                  <span
+                    className={cn(
+                      "text-sm font-medium truncate",
+                      st.status === "completed" && "line-through text-muted-foreground"
+                    )}
+                  >
+                    {st.title}
+                  </span>
+                  <ChevronRight
+                    className={cn(
+                      "w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0",
+                      isExpanded && "rotate-90"
+                    )}
+                  />
+                </button>
+
+                {/* Cost badge */}
+                <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                  {st.estimatedCost > 0 ? `$${st.estimatedCost.toLocaleString()}` : "TBD"}
+                </span>
+
+                {/* Link icon */}
+                {st.link && (
+                  <a
+                    href={st.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-blue-500 hover:text-blue-700"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+
+                {/* Status badge */}
+                <span
+                  className={cn(
+                    "text-xs px-2 py-0.5 rounded-full font-medium shrink-0 hidden sm:inline",
+                    statusCfg.bg,
+                    statusCfg.color
+                  )}
+                >
+                  {statusCfg.label}
+                </span>
+              </div>
+
+              {/* Expanded sub-task detail */}
+              {isExpanded && (
+                <SubTaskDetail
+                  subTask={st}
+                  contractors={contractors}
+                  onUpdate={updateSubTask}
+                  onDelete={() => deleteSubTask(st.id)}
+                />
+              )}
+            </div>
+          );
+        })}
+
+        {subTasks.length === 0 && !showAddForm && (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            No sub-tasks yet. Add one to get started.
+          </div>
+        )}
+
+        {/* Add sub-task row */}
+        {showAddForm ? (
+          <div className="p-3 bg-accent/20">
+            <div className="flex items-center gap-3">
+              <Circle className="w-4 h-4 text-gray-300 shrink-0" />
+              <input
+                autoFocus
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addSubTask()}
+                placeholder="Sub-task name..."
+                className="flex-1 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground"
+              />
+              <input
+                value={newEstCost}
+                onChange={(e) => setNewEstCost(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addSubTask()}
+                placeholder="Est. cost"
+                type="number"
+                className="w-24 text-sm border rounded px-2 py-1"
+              />
+              <button
+                onClick={addSubTask}
+                className="text-sm px-3 py-1 bg-primary text-primary-foreground rounded hover:opacity-90 transition"
+              >
+                Add
+              </button>
+              <button
+                onClick={() => { setShowAddForm(false); setNewTitle(""); setNewEstCost(""); }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/30 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Add sub-task
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-Task Detail Panel ──
+function SubTaskDetail({
+  subTask,
+  contractors,
+  onUpdate,
+  onDelete,
+}: {
+  subTask: SubTask;
+  contractors: Contractor[];
+  onUpdate: (st: SubTask) => void;
+  onDelete: () => void;
+}) {
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [tempValue, setTempValue] = useState("");
+
+  const startEdit = (field: string, value: string) => {
+    setEditingField(field);
+    setTempValue(value);
+  };
+
+  const saveEdit = (field: string) => {
+    const updates: Partial<SubTask> = {};
+    if (field === "description") updates.description = tempValue;
+    if (field === "notes") updates.notes = tempValue;
+    if (field === "estimatedCost") updates.estimatedCost = parseFloat(tempValue) || 0;
+    if (field === "actualCost") updates.actualCost = parseFloat(tempValue) || 0;
+    if (field === "link") updates.link = tempValue || undefined;
+    onUpdate({ ...subTask, ...updates });
+    setEditingField(null);
+  };
+
+  return (
+    <div className="px-10 pb-4 pt-1 bg-accent/10 border-t border-dashed space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Status */}
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</label>
+          <select
+            value={subTask.status}
+            onChange={(e) => onUpdate({ ...subTask, status: e.target.value as SubTaskStatus })}
+            className="w-full text-sm border rounded px-3 py-1.5 mt-1"
+          >
+            {ALL_SUBTASK_STATUSES.map((s) => (
+              <option key={s} value={s}>{SUBTASK_STATUS_CONFIG[s].label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Assigned Contractor */}
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned To</label>
+          <select
+            value={subTask.assignedContractorId || ""}
+            onChange={(e) => onUpdate({ ...subTask, assignedContractorId: e.target.value || undefined })}
+            className="w-full text-sm border rounded px-3 py-1.5 mt-1"
+          >
+            <option value="">Unassigned</option>
+            {contractors.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} {c.company && `(${c.company})`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Estimated Cost */}
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Estimated Cost</label>
+          {editingField === "estimatedCost" ? (
+            <div className="flex gap-1 mt-1">
+              <input
+                autoFocus
+                type="number"
+                value={tempValue}
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveEdit("estimatedCost")}
+                onBlur={() => saveEdit("estimatedCost")}
+                className="flex-1 text-sm border rounded px-3 py-1.5"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => startEdit("estimatedCost", String(subTask.estimatedCost))}
+              className="w-full text-left text-sm border rounded px-3 py-1.5 mt-1 hover:bg-white transition group flex items-center justify-between"
+            >
+              <span>{subTask.estimatedCost > 0 ? `$${subTask.estimatedCost.toLocaleString()}` : "TBD"}</span>
+              <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+            </button>
+          )}
+        </div>
+
+        {/* Actual Cost */}
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Actual Cost</label>
+          {editingField === "actualCost" ? (
+            <div className="flex gap-1 mt-1">
+              <input
+                autoFocus
+                type="number"
+                value={tempValue}
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveEdit("actualCost")}
+                onBlur={() => saveEdit("actualCost")}
+                className="flex-1 text-sm border rounded px-3 py-1.5"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => startEdit("actualCost", String(subTask.actualCost))}
+              className="w-full text-left text-sm border rounded px-3 py-1.5 mt-1 hover:bg-white transition group flex items-center justify-between"
+            >
+              <span>{subTask.actualCost > 0 ? `$${subTask.actualCost.toLocaleString()}` : "$0"}</span>
+              <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+        {editingField === "description" ? (
+          <div className="mt-1">
+            <textarea
+              autoFocus
+              value={tempValue}
+              onChange={(e) => setTempValue(e.target.value)}
+              onBlur={() => saveEdit("description")}
+              className="w-full text-sm border rounded px-3 py-1.5 min-h-[60px]"
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => startEdit("description", subTask.description)}
+            className="w-full text-left text-sm border rounded px-3 py-1.5 mt-1 min-h-[40px] hover:bg-white transition group"
+          >
+            {subTask.description || <span className="text-muted-foreground italic">Click to add description...</span>}
+            <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 inline ml-2" />
+          </button>
+        )}
+      </div>
+
+      {/* Link */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Product Link</label>
+        {editingField === "link" ? (
+          <div className="mt-1">
+            <input
+              autoFocus
+              value={tempValue}
+              onChange={(e) => setTempValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveEdit("link")}
+              onBlur={() => saveEdit("link")}
+              placeholder="https://..."
+              className="w-full text-sm border rounded px-3 py-1.5"
+            />
+          </div>
+        ) : subTask.link ? (
+          <div className="flex items-center gap-2 mt-1">
+            <a
+              href={subTask.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline truncate flex-1"
+            >
+              {subTask.link}
+            </a>
+            <button
+              onClick={() => startEdit("link", subTask.link || "")}
+              className="text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => startEdit("link", "")}
+            className="text-sm text-muted-foreground hover:text-foreground mt-1 italic"
+          >
+            + Add link
+          </button>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</label>
+        {editingField === "notes" ? (
+          <div className="mt-1">
+            <textarea
+              autoFocus
+              value={tempValue}
+              onChange={(e) => setTempValue(e.target.value)}
+              onBlur={() => saveEdit("notes")}
+              className="w-full text-sm border rounded px-3 py-1.5 min-h-[60px]"
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => startEdit("notes", subTask.notes)}
+            className="w-full text-left text-sm border rounded px-3 py-1.5 mt-1 min-h-[40px] hover:bg-white transition group"
+          >
+            {subTask.notes || <span className="text-muted-foreground italic">Click to add notes...</span>}
+            <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 inline ml-2" />
+          </button>
+        )}
+      </div>
+
+      {/* Delete */}
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={() => { if (confirm("Delete this sub-task?")) onDelete(); }}
+          className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 transition"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Delete sub-task
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Contractors Tab ──
+function ContractorsTab({
+  project,
+  contractors,
+  onEditContractor,
+}: {
+  project: RenovationProject;
+  contractors: Contractor[];
   onEditContractor: (c: Contractor) => void;
 }) {
-  const [newMilestone, setNewMilestone] = useState("");
   const assignedContractors = contractors.filter((c) =>
     project.contractorIds.includes(c.id)
   );
 
-  const addMilestone = () => {
-    if (!newMilestone.trim()) return;
-    const milestone: ProjectMilestone = {
-      id: uuidv4(),
-      title: newMilestone.trim(),
-      status: "pending",
-    };
-    onUpdate({
-      ...project,
-      milestones: [...project.milestones, milestone],
-    });
-    setNewMilestone("");
-  };
-
-  const toggleMilestone = (id: string) => {
-    onUpdate({
-      ...project,
-      milestones: project.milestones.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              status: m.status === "completed" ? "pending" : "completed",
-              completedDate:
-                m.status === "completed" ? undefined : new Date().toISOString().split("T")[0],
-            }
-          : m
-      ),
-    });
-  };
-
-  const deleteMilestone = (id: string) => {
-    onUpdate({
-      ...project,
-      milestones: project.milestones.filter((m) => m.id !== id),
-    });
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Notes */}
-      {project.notes && (
-        <div>
-          <h4 className="text-sm font-medium mb-1">Notes</h4>
-          <p className="text-sm text-muted-foreground">{project.notes}</p>
-        </div>
-      )}
-
-      {/* Milestones */}
-      <div>
-        <h4 className="text-sm font-medium mb-2">Milestones</h4>
-        {project.milestones.length === 0 && (
-          <p className="text-sm text-muted-foreground mb-2">No milestones yet.</p>
-        )}
-        <div className="space-y-1 mb-3">
-          {project.milestones.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 group">
-              <button onClick={() => toggleMilestone(m.id)}>
-                {m.status === "completed" ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Circle className="w-4 h-4 text-gray-300" />
-                )}
-              </button>
-              <span
-                className={cn(
-                  "text-sm flex-1",
-                  m.status === "completed" && "line-through text-muted-foreground"
-                )}
-              >
-                {m.title}
-              </span>
-              {m.completedDate && (
-                <span className="text-xs text-muted-foreground">{m.completedDate}</span>
+    <div className="space-y-4">
+      {assignedContractors.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No contractors assigned. Edit the project to assign contractors.</p>
+      ) : (
+        <div className="space-y-2">
+          {assignedContractors.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center gap-3 p-3 border rounded-lg text-sm cursor-pointer hover:bg-accent/50 transition"
+              onClick={() => onEditContractor(c)}
+            >
+              <User className="w-4 h-4 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <span className="font-medium">{c.name}</span>
+                {c.company && <span className="text-muted-foreground"> - {c.company}</span>}
+              </div>
+              <span className="text-xs text-muted-foreground">{c.trade}</span>
+              {c.phone && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Phone className="w-3 h-3" /> {c.phone}
+                </span>
               )}
-              <button
-                onClick={() => deleteMilestone(m.id)}
-                className="opacity-0 group-hover:opacity-100 transition"
-              >
-                <X className="w-3.5 h-3.5 text-muted-foreground hover:text-red-500" />
-              </button>
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
-          <input
-            value={newMilestone}
-            onChange={(e) => setNewMilestone(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addMilestone()}
-            placeholder="Add milestone..."
-            className="flex-1 text-sm border rounded px-3 py-1.5"
-          />
-          <button
-            onClick={addMilestone}
-            className="text-sm px-3 py-1.5 bg-primary text-primary-foreground rounded hover:opacity-90 transition"
-          >
-            Add
-          </button>
-        </div>
-      </div>
-
-      {/* Assigned Contractors */}
-      <div>
-        <h4 className="text-sm font-medium mb-2">Assigned Contractors</h4>
-        {assignedContractors.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No contractors assigned.</p>
-        ) : (
-          <div className="space-y-2">
-            {assignedContractors.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-3 p-2 border rounded text-sm cursor-pointer hover:bg-accent/50 transition"
-                onClick={() => onEditContractor(c)}
-              >
-                <User className="w-4 h-4 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium">{c.name}</span>
-                  {c.company && (
-                    <span className="text-muted-foreground"> - {c.company}</span>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">{c.trade}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -901,6 +1317,7 @@ function ProjectDialog({
           priority,
           estimatedStartDate: startDate || undefined,
           estimatedEndDate: endDate || undefined,
+          subTasks: [],
           milestones: [],
           contractorIds: selectedContractorIds,
           quotes: [],

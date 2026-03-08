@@ -2,6 +2,8 @@ import { create } from "zustand";
 import type {
   Scenario,
   BudgetLineItem,
+  RenovationProject,
+  Contractor,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -23,6 +25,19 @@ interface AppState {
   // Photos
   selectedPhoto: string | null;
   setSelectedPhoto: (photo: string | null) => void;
+
+  // Projects
+  projects: RenovationProject[];
+  contractors: Contractor[];
+  loadProjects: () => Promise<void>;
+  saveProjects: () => Promise<void>;
+  addProject: (project: RenovationProject) => Promise<void>;
+  updateProject: (project: RenovationProject) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  addContractor: (contractor: Contractor) => Promise<void>;
+  updateContractor: (contractor: Contractor) => Promise<void>;
+  deleteContractor: (id: string) => Promise<void>;
+  updateProjectStatus: (id: string, status: RenovationProject["status"]) => Promise<void>;
 }
 
 const createEmptyScenario = (name: string): Scenario => ({
@@ -142,4 +157,100 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSelectedPhoto: (photo) => set({ selectedPhoto: photo }),
+
+  // Projects
+  projects: [],
+  contractors: [],
+
+  loadProjects: async () => {
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      set({ projects: data.projects || [], contractors: data.contractors || [] });
+    } catch {
+      console.error("Failed to load projects");
+    }
+  },
+
+  saveProjects: async () => {
+    const { projects, contractors } = get();
+    await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projects, contractors }),
+    });
+  },
+
+  addProject: async (project) => {
+    await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", project }),
+    });
+    set((s) => ({ projects: [...s.projects, project] }));
+  },
+
+  updateProject: async (project) => {
+    const updated = { ...project, updatedAt: new Date().toISOString() };
+    await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", project: updated }),
+    });
+    set((s) => ({
+      projects: s.projects.map((p) => (p.id === updated.id ? updated : p)),
+    }));
+  },
+
+  deleteProject: async (id) => {
+    await fetch("/api/projects", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", id }),
+    });
+    set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+  },
+
+  addContractor: async (contractor) => {
+    await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "contractor", contractor }),
+    });
+    set((s) => ({ contractors: [...s.contractors, contractor] }));
+  },
+
+  updateContractor: async (contractor) => {
+    await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "contractor", contractor }),
+    });
+    set((s) => ({
+      contractors: s.contractors.map((c) => (c.id === contractor.id ? contractor : c)),
+    }));
+  },
+
+  deleteContractor: async (id) => {
+    await fetch("/api/projects", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "contractor", id }),
+    });
+    set((s) => ({ contractors: s.contractors.filter((c) => c.id !== id) }));
+  },
+
+  updateProjectStatus: async (id, status) => {
+    const project = get().projects.find((p) => p.id === id);
+    if (!project) return;
+    const updated = { ...project, status, updatedAt: new Date().toISOString() };
+    await fetch("/api/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "project", project: updated }),
+    });
+    set((s) => ({
+      projects: s.projects.map((p) => (p.id === id ? updated : p)),
+    }));
+  },
 }));

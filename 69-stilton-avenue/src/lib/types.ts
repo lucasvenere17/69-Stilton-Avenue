@@ -82,6 +82,80 @@ export interface BudgetLineItem {
   subtotal: number;
 }
 
+// Project Tracker Types
+export type ProjectStatus =
+  | "not_started"
+  | "getting_quotes"
+  | "quoted"
+  | "scheduled"
+  | "in_progress"
+  | "inspection_needed"
+  | "on_hold"
+  | "completed";
+
+export interface Contractor {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  phone: string;
+  trade: string;
+  notes: string;
+}
+
+export interface ProjectQuote {
+  id: string;
+  contractorId: string;
+  amount: number;
+  receivedDate: string;
+  expiryDate?: string;
+  accepted: boolean;
+  notes: string;
+}
+
+export interface ProjectMilestone {
+  id: string;
+  title: string;
+  dueDate?: string;
+  completedDate?: string;
+  status: "pending" | "completed" | "overdue";
+}
+
+export interface ProjectCommunication {
+  id: string;
+  date: string;
+  type: "email" | "phone" | "in_person" | "note";
+  summary: string;
+  contractorId?: string;
+}
+
+export interface RenovationProject {
+  id: string;
+  name: string;
+  category: string;
+  status: ProjectStatus;
+  priority: "low" | "medium" | "high" | "critical";
+  estimatedStartDate?: string;
+  estimatedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+  milestones: ProjectMilestone[];
+  contractorIds: string[];
+  quotes: ProjectQuote[];
+  acceptedQuoteId?: string;
+  budgetItemIds: string[];
+  communications: ProjectCommunication[];
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  dependsOn: string[];
+}
+
+export interface ProjectTrackerData {
+  projects: RenovationProject[];
+  contractors: Contractor[];
+}
+
 export interface Scenario {
   id: string;
   name: string;

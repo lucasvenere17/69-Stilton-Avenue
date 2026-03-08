@@ -25,8 +25,9 @@ export default function Home() {
         Explore renovation possibilities for 69 Stilton Avenue, Kleinburg, Ontario.
         Use the tabs above to compare before/after photos, customize the kitchen, and plan your budget.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-3xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-4xl">
         {[
+          { href: "/projects", title: "Project Tracker", desc: "Track renovation projects, contractors, quotes, and timelines" },
           { href: "/before-after", title: "Before / After", desc: "Compare photos with AI-generated renovation previews" },
           { href: "/kitchen", title: "Kitchen Customizer", desc: "Try different materials, colors, and styles" },
           { href: "/budget", title: "Budget Estimation", desc: "Plan renovation costs with editable line items" },

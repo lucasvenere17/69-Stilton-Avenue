@@ -97,6 +97,293 @@ const ALL_STATUSES: ProjectStatus[] = [
 
 const ALL_SUBTASK_STATUSES: SubTaskStatus[] = ["not_started", "in_progress", "completed"];
 
+// ── Suggested Contractors Database (real local businesses near Kleinburg/Vaughan) ──
+interface SuggestedContractor {
+  name: string;
+  company: string;
+  trade: string;
+  phone: string;
+  email: string;
+  website: string;
+  rating: number;
+  description: string;
+  categories: string[]; // which project categories this contractor is relevant for
+}
+
+const SUGGESTED_CONTRACTORS: SuggestedContractor[] = [
+  // Kitchen
+  {
+    name: "Castle Kitchens",
+    company: "Castle Kitchens",
+    trade: "Kitchen Renovation",
+    phone: "905-944-0060",
+    email: "",
+    website: "https://castlekitchens.ca",
+    rating: 4.8,
+    description: "Kitchen renovation company in Vaughan serving Kleinburg. Free consultations available.",
+    categories: ["Kitchen"],
+  },
+  {
+    name: "905 Reno",
+    company: "905 Reno",
+    trade: "Kitchen Renovation",
+    phone: "",
+    email: "",
+    website: "https://905reno.ca",
+    rating: 4.7,
+    description: "Kitchen renovation services throughout Vaughan including Woodbridge, Maple, Kleinburg, and Concord.",
+    categories: ["Kitchen"],
+  },
+  {
+    name: "Altima Kitchen and Closets",
+    company: "Altima Kitchen and Closets",
+    trade: "Kitchen & Closets",
+    phone: "",
+    email: "",
+    website: "https://kitchenrenovationvaughan.ca",
+    rating: 4.6,
+    description: "Kitchen renovation and closet contractor in Vaughan.",
+    categories: ["Kitchen", "Master Bedroom"],
+  },
+  {
+    name: "Peace of Mind Interiors",
+    company: "Peace of Mind Interiors",
+    trade: "Kitchen Renovation",
+    phone: "",
+    email: "",
+    website: "https://www.peaceofmindinteriors.ca",
+    rating: 4.7,
+    description: "Kitchen renovations tailored to every Vaughan community including Kleinburg estates. 0% financing available.",
+    categories: ["Kitchen"],
+  },
+  // Painting
+  {
+    name: "Ecopainting",
+    company: "Ecopainting",
+    trade: "Painting",
+    phone: "416-733-7767",
+    email: "",
+    website: "https://ecopainting.ca",
+    rating: 4.8,
+    description: "Established painting contractor servicing Vaughan — beautiful homes painted in Maple, Kleinburg, and Woodbridge.",
+    categories: ["Throughout House"],
+  },
+  {
+    name: "CertaPro Painters",
+    company: "CertaPro Painters Richmond Hill & Vaughan",
+    trade: "Painting",
+    phone: "",
+    email: "",
+    website: "https://certapro.com/richmond-hill-and-vaughan/",
+    rating: 4.7,
+    description: "Interior and exterior painting serving Richmond Hill and Vaughan. National brand with local teams.",
+    categories: ["Throughout House"],
+  },
+  {
+    name: "Arkady's Painting",
+    company: "Arkady's Painting",
+    trade: "Painting",
+    phone: "(647) 812-1772",
+    email: "",
+    website: "https://arkadyspainting.com",
+    rating: 4.8,
+    description: "Well-known and respected painter with over 20 years of experience.",
+    categories: ["Throughout House"],
+  },
+  {
+    name: "Coda Installations",
+    company: "Coda Installations",
+    trade: "Painting",
+    phone: "647-251-8115",
+    email: "",
+    website: "https://www.codainstallations.com",
+    rating: 4.6,
+    description: "Interior and exterior painting services in Vaughan, Kleinburg, Thornhill, and beyond.",
+    categories: ["Throughout House"],
+  },
+  // Master Bedroom / Closets
+  {
+    name: "ClosetGuy",
+    company: "ClosetGuy.ca",
+    trade: "Custom Closets & Built-ins",
+    phone: "",
+    email: "",
+    website: "https://www.closetguy.ca",
+    rating: 4.7,
+    description: "Walk-in closets, reach-in closets, pantries, entertainment centers. Serves GTA including Vaughan.",
+    categories: ["Master Bedroom", "Living Room", "Mudroom", "Laundry Room"],
+  },
+  {
+    name: "ClosetCo",
+    company: "ClosetCo",
+    trade: "Custom Closets",
+    phone: "",
+    email: "",
+    website: "https://closetco.ca",
+    rating: 4.8,
+    description: "Custom closet systems in Vaughan and GTA. Over 30 years of experience. FREE in-home design consultation.",
+    categories: ["Master Bedroom"],
+  },
+  {
+    name: "Hang Ups Custom Closets By JT",
+    company: "Hang Ups Custom Closets",
+    trade: "Custom Closets & Built-ins",
+    phone: "905-738-8218",
+    email: "",
+    website: "",
+    rating: 4.6,
+    description: "Custom built-ins, closet organizers, wall units, pantries, laundry rooms. Located at 411 Bradwick Dr, Vaughan.",
+    categories: ["Master Bedroom", "Living Room", "Mudroom", "Laundry Room"],
+  },
+  // Bathroom / Ensuite
+  {
+    name: "Refined Renos",
+    company: "Refined Renos",
+    trade: "Bathroom Renovation",
+    phone: "416-875-4802",
+    email: "info@refinedrenos.com",
+    website: "https://refinedrenos.com",
+    rating: 4.8,
+    description: "Serves homeowners across Vaughan from Kleinburg and Maple to Concord and Thornhill.",
+    categories: ["Ensuite"],
+  },
+  {
+    name: "Banz Renovation",
+    company: "Banz Renovation",
+    trade: "Bathroom & Home Renovation",
+    phone: "",
+    email: "",
+    website: "https://www.banzrenovations.com",
+    rating: 4.7,
+    description: "Leading bathroom renovation contractor in Vaughan, Kleinburg, Woodbridge. Over 25 years of expertise.",
+    categories: ["Ensuite", "Kitchen"],
+  },
+  {
+    name: "Revival Construction",
+    company: "Revival Construction",
+    trade: "Bathroom Renovation",
+    phone: "",
+    email: "",
+    website: "https://revivalconstruction.ca",
+    rating: 4.6,
+    description: "Bathroom renovation services for Woodbridge, Maple, and Kleinburg. Handles ensuites and custom design.",
+    categories: ["Ensuite"],
+  },
+  {
+    name: "Magic Reno",
+    company: "Magic Reno",
+    trade: "General Renovation",
+    phone: "(647) 891-7300",
+    email: "",
+    website: "https://www.magicreno.ca",
+    rating: 4.5,
+    description: "Qualified renovation contractors serving Kleinburg. Kitchen, bathroom, and basement renovations.",
+    categories: ["Ensuite", "Kitchen"],
+  },
+  // Built-ins / Carpentry (Mudroom, Laundry, Wall Unit)
+  {
+    name: "Lancaster Custom Cabinets & Closets",
+    company: "Lancaster Custom Cabinets",
+    trade: "Custom Cabinetry & Built-ins",
+    phone: "",
+    email: "",
+    website: "https://lancastercustoms.com",
+    rating: 4.9,
+    description: "Premium luxury kitchens and custom cabinetry based in Vaughan. Foyer cabinetry, closet built-ins, Murphy beds, laundry rooms.",
+    categories: ["Mudroom", "Laundry Room", "Living Room", "Master Bedroom"],
+  },
+  {
+    name: "Alliance Millwork",
+    company: "Alliance Millwork",
+    trade: "Custom Cabinetry & Millwork",
+    phone: "",
+    email: "",
+    website: "https://alliancemillwork.ca",
+    rating: 4.7,
+    description: "High-quality cabinetry for residential projects in GTA. Vaughan showroom. 80% customer retention rate.",
+    categories: ["Mudroom", "Laundry Room", "Living Room"],
+  },
+  {
+    name: "Bosco Cabinetry",
+    company: "Bosco Cabinetry",
+    trade: "Custom Built-ins & Entertainment Centers",
+    phone: "",
+    email: "",
+    website: "https://boscocabinetry.ca",
+    rating: 4.7,
+    description: "Entertainment centers ($5K-$15K), media walls, and custom built-ins. Serves Vaughan and GTA.",
+    categories: ["Living Room"],
+  },
+  // Wallpaper
+  {
+    name: "Precision Wallpaper",
+    company: "Precision Wallpaper",
+    trade: "Wallpaper Installation",
+    phone: "",
+    email: "",
+    website: "https://precisionwallpaper.ca",
+    rating: 4.8,
+    description: "Traditional to specialty artisan wallpapers and murals. Serves Southern and Central Ontario including GTA.",
+    categories: ["Powder Room"],
+  },
+  {
+    name: "Katie's Wallpaper & Design",
+    company: "Katie's Wallpaper",
+    trade: "Wallpaper Installation",
+    phone: "",
+    email: "",
+    website: "http://www.katieswallpaper.ca",
+    rating: 4.7,
+    description: "Professional wallpaper installation serving Vaughan, Woodbridge, Richmond Hill, and GTA.",
+    categories: ["Powder Room"],
+  },
+  {
+    name: "Prestige Painting GTA",
+    company: "Prestige Painting GTA",
+    trade: "Painting & Wallpaper",
+    phone: "",
+    email: "",
+    website: "https://www.prestigepaintinggta.ca",
+    rating: 4.6,
+    description: "Leaders in wallpaper installation in Toronto, Vaughan, and GTA.",
+    categories: ["Powder Room", "Throughout House"],
+  },
+  // Electrical
+  {
+    name: "Antech Electric",
+    company: "Antech Electric",
+    trade: "Electrician",
+    phone: "",
+    email: "",
+    website: "https://www.antechelectric.com",
+    rating: 4.8,
+    description: "Licensed ESA-certified electricians trusted by Vaughan property owners for nearly 4 decades. Serves Kleinburg.",
+    categories: ["Master Bedroom", "Kitchen", "Throughout House"],
+  },
+  {
+    name: "Hi-Lite Electric Inc.",
+    company: "Hi-Lite Electric Inc.",
+    trade: "Electrician",
+    phone: "",
+    email: "",
+    website: "https://hi-liteelectricinc.ca",
+    rating: 4.7,
+    description: "Licensed home electricians in Vaughan. ESA Authorized Contractor Program affiliated.",
+    categories: ["Master Bedroom", "Kitchen"],
+  },
+  {
+    name: "Shockwave Electrical Services",
+    company: "Shockwave Electrical Services LTD",
+    trade: "Electrician",
+    phone: "",
+    email: "",
+    website: "https://shockwave-electrical.ca",
+    rating: 4.6,
+    description: "Top residential electrical company in Vaughan. Interior and exterior lighting systems.",
+    categories: ["Master Bedroom", "Kitchen", "Throughout House"],
+  },
+];
+
 // ── Main Page ──
 export default function ProjectsPage() {
   const {
@@ -906,77 +1193,198 @@ function ContractorsTab({
   onEditContractor: (c: Contractor) => void;
 }) {
   const router = useRouter();
+  const { addContractor, updateProject } = useAppStore();
   const [findModalOpen, setFindModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
   const assignedContractors = contractors.filter((c) =>
     project.contractorIds.includes(c.id)
   );
 
+  // Get suggested contractors for this project's category
+  const suggested = SUGGESTED_CONTRACTORS.filter((sc) =>
+    sc.categories.includes(project.category)
+  );
+
+  // Also filter by search query across all contractors
+  const searchResults = searchQuery.trim()
+    ? SUGGESTED_CONTRACTORS.filter((sc) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          sc.name.toLowerCase().includes(q) ||
+          sc.company.toLowerCase().includes(q) ||
+          sc.trade.toLowerCase().includes(q) ||
+          sc.description.toLowerCase().includes(q) ||
+          sc.categories.some((cat) => cat.toLowerCase().includes(q))
+        );
+      })
+    : [];
+
   const handleDraftOutreach = (contractorId: string) => {
     router.push(`/communications?projectId=${project.id}&contractorId=${contractorId}`);
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <button
-          onClick={() => setFindModalOpen(true)}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition font-medium"
-        >
-          <Search className="w-3.5 h-3.5" />
-          Find Contractors
-        </button>
-      </div>
+  const handleSaveContractor = async (sc: SuggestedContractor) => {
+    const newContractor: Contractor = {
+      id: uuidv4(),
+      name: sc.name,
+      company: sc.company,
+      email: sc.email,
+      phone: sc.phone,
+      trade: sc.trade,
+      notes: sc.description,
+      website: sc.website || undefined,
+      rating: sc.rating,
+    };
+    await addContractor(newContractor);
+    // Auto-assign to this project
+    await updateProject({
+      ...project,
+      contractorIds: [...project.contractorIds, newContractor.id],
+    });
+    setSavedIds((prev) => { const next = new Set(prev); next.add(sc.name); return next; });
+  };
 
-      {assignedContractors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No contractors assigned. Edit the project to assign contractors, or use Find Contractors above.</p>
-      ) : (
-        <div className="space-y-2">
-          {assignedContractors.map((c) => (
-            <div
-              key={c.id}
-              className="flex items-center gap-3 p-3 border rounded-lg text-sm"
+  const isAlreadySaved = (sc: SuggestedContractor) => {
+    return (
+      savedIds.has(sc.name) ||
+      contractors.some(
+        (c) => c.name === sc.name || c.company === sc.company
+      )
+    );
+  };
+
+  const renderContractorCard = (sc: SuggestedContractor, showSaveButton: boolean) => (
+    <div key={sc.name + sc.trade} className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm">{sc.name}</span>
+            {sc.rating > 0 && (
+              <span className="text-yellow-500 inline-flex items-center gap-0.5 text-xs">
+                <Star className="w-3 h-3 fill-current" /> {sc.rating}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">{sc.trade}</div>
+        </div>
+        {showSaveButton && (
+          isAlreadySaved(sc) ? (
+            <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium flex items-center gap-1 shrink-0">
+              <CheckCircle2 className="w-3 h-3" /> Saved
+            </span>
+          ) : (
+            <button
+              onClick={() => handleSaveContractor(sc)}
+              className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:opacity-90 transition flex items-center gap-1 shrink-0"
             >
-              <User className="w-4 h-4 text-muted-foreground" />
+              <Plus className="w-3 h-3" /> Save & Assign
+            </button>
+          )
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{sc.description}</p>
+      <div className="flex items-center gap-3 flex-wrap">
+        {sc.phone && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Phone className="w-3 h-3" /> {sc.phone}
+          </span>
+        )}
+        {sc.email && (
+          <a href={`mailto:${sc.email}`} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <Mail className="w-3 h-3" /> {sc.email}
+          </a>
+        )}
+        {sc.website && (
+          <a
+            href={sc.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+          >
+            <Globe className="w-3 h-3" /> Website
+          </a>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Assigned Contractors */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-medium">Assigned Contractors</h4>
+          <button
+            onClick={() => setFindModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition font-medium"
+          >
+            <Search className="w-3.5 h-3.5" />
+            Find Contractors
+          </button>
+        </div>
+
+        {assignedContractors.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No contractors assigned yet. Use &quot;Find Contractors&quot; to browse recommended contractors for this project.</p>
+        ) : (
+          <div className="space-y-2">
+            {assignedContractors.map((c) => (
               <div
-                className="flex-1 min-w-0 cursor-pointer hover:text-primary transition"
-                onClick={() => onEditContractor(c)}
+                key={c.id}
+                className="flex items-center gap-3 p-3 border rounded-lg text-sm"
               >
-                <span className="font-medium">{c.name}</span>
-                {c.company && <span className="text-muted-foreground"> - {c.company}</span>}
-                {c.rating && (
-                  <span className="ml-2 text-yellow-500 inline-flex items-center gap-0.5">
-                    <Star className="w-3 h-3 fill-current" /> {c.rating}
+                <User className="w-4 h-4 text-muted-foreground" />
+                <div
+                  className="flex-1 min-w-0 cursor-pointer hover:text-primary transition"
+                  onClick={() => onEditContractor(c)}
+                >
+                  <span className="font-medium">{c.name}</span>
+                  {c.company && <span className="text-muted-foreground"> - {c.company}</span>}
+                  {c.rating && (
+                    <span className="ml-2 text-yellow-500 inline-flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-current" /> {c.rating}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">{c.trade}</span>
+                {c.phone && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="w-3 h-3" /> {c.phone}
                   </span>
                 )}
-              </div>
-              <span className="text-xs text-muted-foreground">{c.trade}</span>
-              {c.phone && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Phone className="w-3 h-3" /> {c.phone}
-                </span>
-              )}
-              {c.website && (
-                <a
-                  href={c.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
+                {c.website && (
+                  <a
+                    href={c.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Globe className="w-3 h-3" />
+                  </a>
+                )}
+                <button
+                  onClick={() => handleDraftOutreach(c.id)}
+                  className="text-xs px-2 py-1 border rounded hover:bg-accent transition flex items-center gap-1"
                 >
-                  <Globe className="w-3 h-3" />
-                </a>
-              )}
-              <button
-                onClick={() => handleDraftOutreach(c.id)}
-                className="text-xs px-2 py-1 border rounded hover:bg-accent transition flex items-center gap-1"
-              >
-                <Send className="w-3 h-3" />
-                Draft Outreach
-              </button>
-            </div>
-          ))}
+                  <Send className="w-3 h-3" />
+                  Draft Outreach
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Suggested Contractors (auto-populated based on project category) */}
+      {suggested.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium mb-1">Recommended for {project.category}</h4>
+          <p className="text-xs text-muted-foreground mb-3">Local contractors near Kleinburg/Vaughan that match this project type.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {suggested.map((sc) => renderContractorCard(sc, true))}
+          </div>
         </div>
       )}
 
@@ -984,21 +1392,22 @@ function ContractorsTab({
       <Dialog.Root open={findModalOpen} onOpenChange={setFindModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-full max-w-lg z-50 max-h-[80vh] overflow-y-auto">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl z-50 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <Dialog.Title className="text-lg font-semibold">Find Contractors</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold">Find Contractors for {project.name}</Dialog.Title>
               <Dialog.Close className="text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </Dialog.Close>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* Search */}
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for contractors by trade, name, or location..."
+                  placeholder="Search by trade, name, or project type..."
                   className="flex-1 border rounded-lg px-3 py-2 text-sm"
                 />
                 <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90 transition">
@@ -1006,29 +1415,46 @@ function ContractorsTab({
                 </button>
               </div>
 
-              <div className="text-center py-8 border rounded-lg bg-gray-50">
-                <Search className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm font-medium text-muted-foreground">AI contractor search coming soon</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Use the search above to manually find contractors, or add them from the main contractors list.
-                </p>
-              </div>
-
-              {/* Recommended Contractors Section */}
-              {assignedContractors.length > 0 && (
+              {/* Search Results */}
+              {searchQuery.trim() && (
                 <div>
-                  <h4 className="text-sm font-medium mb-2">Currently Assigned</h4>
-                  <div className="space-y-2">
-                    {assignedContractors.map((c) => (
-                      <div key={c.id} className="flex items-center gap-3 p-3 border rounded-lg text-sm">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <div className="flex-1">
-                          <span className="font-medium">{c.name}</span>
-                          {c.company && <span className="text-muted-foreground"> - {c.company}</span>}
-                        </div>
-                        <span className="text-xs text-muted-foreground">{c.trade}</span>
-                      </div>
-                    ))}
+                  <h4 className="text-sm font-medium mb-2">
+                    Search Results ({searchResults.length})
+                  </h4>
+                  {searchResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No contractors found matching &quot;{searchQuery}&quot;.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {searchResults.map((sc) => renderContractorCard(sc, true))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recommended for this project */}
+              {!searchQuery.trim() && suggested.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Recommended for {project.category}</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    These contractors serve the Kleinburg/Vaughan area and specialize in work relevant to this project.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {suggested.map((sc) => renderContractorCard(sc, true))}
+                  </div>
+                </div>
+              )}
+
+              {/* All Contractors */}
+              {!searchQuery.trim() && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">All Available Contractors</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Browse all contractors in our database.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {SUGGESTED_CONTRACTORS.filter(
+                      (sc) => !suggested.includes(sc)
+                    ).map((sc) => renderContractorCard(sc, true))}
                   </div>
                 </div>
               )}

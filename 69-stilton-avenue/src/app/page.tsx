@@ -23,13 +23,10 @@ export default function Home() {
       <h2 className="text-3xl font-bold mb-4">Welcome to the Renovation Portal</h2>
       <p className="text-muted-foreground mb-8 max-w-lg">
         Explore renovation possibilities for 69 Stilton Avenue, Kleinburg, Ontario.
-        Use the tabs above to edit blueprints, view 3D models, compare before/after photos,
-        customize the kitchen, and plan your budget.
+        Use the tabs above to compare before/after photos, customize the kitchen, and plan your budget.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-3xl">
         {[
-          { href: "/blueprint", title: "Blueprint Editor", desc: "Draw walls, place doors & windows on floor plans" },
-          { href: "/model", title: "3D Model", desc: "Walk through an interactive 3D model of the home" },
           { href: "/before-after", title: "Before / After", desc: "Compare photos with AI-generated renovation previews" },
           { href: "/kitchen", title: "Kitchen Customizer", desc: "Try different materials, colors, and styles" },
           { href: "/budget", title: "Budget Estimation", desc: "Plan renovation costs with editable line items" },

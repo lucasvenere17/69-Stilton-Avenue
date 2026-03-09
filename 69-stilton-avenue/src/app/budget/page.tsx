@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type { BudgetItem } from "@/lib/types";
-import { Link2, CheckCircle2 } from "lucide-react";
+import { Link2, CheckCircle2, Pencil } from "lucide-react";
 
 type BudgetTab = "renovation" | "furniture" | "all";
 
@@ -22,18 +22,68 @@ function groupByCategory(items: BudgetItem[]): Record<string, BudgetItem[]> {
   return groups;
 }
 
+// ── Editable Cost Cell ──
+function EditableCostCell({
+  value,
+  onSave,
+  placeholder,
+}: {
+  value: number;
+  onSave: (val: number) => void;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [tempVal, setTempVal] = useState(String(value));
+
+  const commit = () => {
+    const parsed = parseFloat(tempVal) || 0;
+    if (parsed !== value) onSave(parsed);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        value={tempVal}
+        onChange={(e) => setTempVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="border rounded px-2 py-1 text-sm w-28 text-right focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+        min={0}
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setTempVal(String(value));
+        setEditing(true);
+      }}
+      className="text-right w-full hover:bg-primary/5 rounded px-2 py-1 -mx-2 transition group"
+      title="Click to edit"
+    >
+      <span>{value > 0 ? `$${value.toLocaleString()}` : (placeholder || "TBD")}</span>
+      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 inline ml-1.5" />
+    </button>
+  );
+}
+
 function CategoryTable({
   category,
   items,
-  editingId,
-  onEdit,
   onUpdateCost,
   projects,
 }: {
   category: string;
   items: BudgetItem[];
-  editingId: string | null;
-  onEdit: (id: string | null) => void;
   onUpdateCost: (item: BudgetItem, field: "estimatedCost" | "actualCost", value: number) => void;
   projects: { id: string; name: string }[];
 }) {
@@ -68,8 +118,7 @@ function CategoryTable({
             return (
               <tr
                 key={item.id}
-                className="border-b hover:bg-muted/30 cursor-pointer"
-                onClick={() => onEdit(item.id === editingId ? null : item.id)}
+                className="border-b hover:bg-muted/30"
               >
                 <td className="p-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -107,40 +156,17 @@ function CategoryTable({
                   </div>
                 </td>
                 <td className="p-3 text-right">
-                  {editingId === item.id ? (
-                    <input
-                      type="number"
-                      value={item.estimatedCost}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        onUpdateCost(item, "estimatedCost", Number(e.target.value));
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="border rounded px-2 py-1 text-sm w-24 text-right"
-                      min={0}
-                    />
-                  ) : (
-                    formatCurrency(item.estimatedCost)
-                  )}
+                  <EditableCostCell
+                    value={item.estimatedCost}
+                    onSave={(val) => onUpdateCost(item, "estimatedCost", val)}
+                  />
                 </td>
                 <td className="p-3 text-right">
-                  {editingId === item.id ? (
-                    <input
-                      type="number"
-                      value={item.actualCost}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        onUpdateCost(item, "actualCost", Number(e.target.value));
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="border rounded px-2 py-1 text-sm w-24 text-right"
-                      min={0}
-                    />
-                  ) : item.actualCost > 0 ? (
-                    `$${item.actualCost.toLocaleString()}`
-                  ) : (
-                    <span className="text-muted-foreground">--</span>
-                  )}
+                  <EditableCostCell
+                    value={item.actualCost}
+                    onSave={(val) => onUpdateCost(item, "actualCost", val)}
+                    placeholder="--"
+                  />
                 </td>
                 <td className={`p-3 text-right ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-muted-foreground"}`}>
                   {item.actualCost > 0
@@ -177,7 +203,6 @@ export default function BudgetPage() {
     toastMessage, setToastMessage,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState<BudgetTab>("renovation");
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -351,8 +376,6 @@ export default function BudgetPage() {
               key={category}
               category={category}
               items={items}
-              editingId={editingId}
-              onEdit={setEditingId}
               onUpdateCost={handleUpdateCost}
               projects={projectsList}
             />
@@ -382,8 +405,6 @@ export default function BudgetPage() {
               key={category}
               category={category}
               items={items}
-              editingId={editingId}
-              onEdit={setEditingId}
               onUpdateCost={handleUpdateCost}
               projects={projectsList}
             />

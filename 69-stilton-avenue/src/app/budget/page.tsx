@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type { BudgetItem } from "@/lib/types";
-import { Link2, CheckCircle2, Pencil } from "lucide-react";
+import { Link2, CheckCircle2, Pencil, Download } from "lucide-react";
 
 type BudgetTab = "renovation" | "furniture" | "all";
 
@@ -196,6 +196,75 @@ function CategoryTable({
   );
 }
 
+// ── CSV Export Helper ──
+function escapeCsvValue(value: string | number): string {
+  const str = String(value);
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function exportBudgetCsv(renovation: BudgetItem[], furniture: BudgetItem[]) {
+  const headers = ["Category", "Item Name", "Estimated Cost", "Actual Cost", "Difference", "Budget Type"];
+  const rows: string[] = [];
+
+  // Renovation section
+  if (renovation.length > 0) {
+    rows.push("--- Renovation Budget ---,,,,, ");
+    for (const item of renovation) {
+      const diff = item.actualCost > 0 ? item.estimatedCost - item.actualCost : 0;
+      rows.push([
+        escapeCsvValue(item.category),
+        escapeCsvValue(item.name),
+        item.estimatedCost,
+        item.actualCost,
+        diff,
+        "Renovation",
+      ].join(","));
+    }
+    const renTotal = renovation.reduce((s, i) => s + i.estimatedCost, 0);
+    const renActual = renovation.reduce((s, i) => s + i.actualCost, 0);
+    rows.push(`,Renovation Subtotal,${renTotal},${renActual},${renTotal - renActual},`);
+    rows.push("");
+  }
+
+  // Furniture section
+  if (furniture.length > 0) {
+    rows.push("--- Furniture Budget ---,,,,, ");
+    for (const item of furniture) {
+      const diff = item.actualCost > 0 ? item.estimatedCost - item.actualCost : 0;
+      rows.push([
+        escapeCsvValue(item.category),
+        escapeCsvValue(item.name),
+        item.estimatedCost,
+        item.actualCost,
+        diff,
+        "Furniture",
+      ].join(","));
+    }
+    const furTotal = furniture.reduce((s, i) => s + i.estimatedCost, 0);
+    const furActual = furniture.reduce((s, i) => s + i.actualCost, 0);
+    rows.push(`,Furniture Subtotal,${furTotal},${furActual},${furTotal - furActual},`);
+    rows.push("");
+  }
+
+  // Grand totals
+  const allItems = [...renovation, ...furniture];
+  const grandEst = allItems.reduce((s, i) => s + i.estimatedCost, 0);
+  const grandActual = allItems.reduce((s, i) => s + i.actualCost, 0);
+  rows.push(`,GRAND TOTAL,${grandEst},${grandActual},${grandEst - grandActual},`);
+
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `69-stilton-budget-${new Date().toISOString().split("T")[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function BudgetPage() {
   const {
     budgetData, loadBudgets, saveBudgets, updateBudgetItemCost,
@@ -285,13 +354,22 @@ export default function BudgetPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Budget Tracker</h2>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => exportBudgetCsv(renovationItems, furnitureItems)}
+            className="flex items-center gap-2 px-4 py-2 text-sm border rounded-md hover:bg-accent transition"
+          >
+            <Download className="w-4 h-4" />
+            Export Budget
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

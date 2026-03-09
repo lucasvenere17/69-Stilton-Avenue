@@ -29,6 +29,7 @@ export default function Home() {
         {[
           { href: "/projects", title: "Project Tracker", desc: "Track renovation projects, contractors, quotes, and timelines" },
           { href: "/communications", title: "Communications", desc: "Manage emails, outreach, and contractor communications" },
+          { href: "/timeline", title: "Timeline", desc: "Gantt chart view of all project schedules and dependencies" },
           { href: "/before-after", title: "Before / After", desc: "Compare photos with AI-generated renovation previews" },
           { href: "/kitchen", title: "Kitchen Customizer", desc: "Try different materials, colors, and styles" },
           { href: "/budget", title: "Budget Estimation", desc: "Plan renovation costs with editable line items" },

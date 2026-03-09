@@ -42,6 +42,8 @@ import {
   Globe,
   Send,
   Link2,
+  AlertTriangle,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -385,6 +387,45 @@ const SUGGESTED_CONTRACTORS: SuggestedContractor[] = [
   },
 ];
 
+// ── CSV Export Helper ──
+function escapeCsvValue(value: string | number): string {
+  const str = String(value);
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function exportProjectsCsv(projects: RenovationProject[]) {
+  const headers = [
+    "Project Name", "Category", "Status", "Priority",
+    "Start Date", "End Date", "Estimated Cost",
+    "Sub-task Count", "Completed Sub-tasks",
+  ];
+  const rows = projects.map((p) => {
+    const completedSt = (p.subTasks || []).filter((st) => st.status === "completed").length;
+    return [
+      escapeCsvValue(p.name),
+      escapeCsvValue(p.category),
+      escapeCsvValue(STATUS_CONFIG[p.status].label),
+      escapeCsvValue(p.priority),
+      p.estimatedStartDate || "",
+      p.estimatedEndDate || "",
+      p.estimatedCost || 0,
+      (p.subTasks || []).length,
+      completedSt,
+    ].join(",");
+  });
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `69-stilton-projects-${new Date().toISOString().split("T")[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Main Page ──
 export default function ProjectsPage() {
   const {
@@ -497,6 +538,13 @@ export default function ProjectsPage() {
           <Users className="w-4 h-4" />
           Add Contractor
         </button>
+        <button
+          onClick={() => exportProjectsCsv(projects)}
+          className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-accent transition text-sm font-medium ml-auto"
+        >
+          <Download className="w-4 h-4" />
+          Export Projects
+        </button>
       </div>
 
       {/* Project Cards */}
@@ -535,6 +583,17 @@ export default function ProjectsPage() {
                       <span className={cn("text-xs font-medium", priorityCfg.color)}>
                         {priorityCfg.label}
                       </span>
+                      {project.dependsOn.length > 0 &&
+                        project.dependsOn.some(
+                          (depId) => {
+                            const dep = projects.find((p) => p.id === depId);
+                            return dep && dep.status !== "completed";
+                          }
+                        ) && (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-600" title="Has unmet dependencies">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 flex items-center gap-4">
                       {subTasks.length > 0 && (
@@ -656,8 +715,60 @@ function ProjectDetail({
   onEditContractor: (c: Contractor) => void;
   onStatusChange: (id: string, status: ProjectStatus) => Promise<void>;
 }) {
+  const { projects: allProjects } = useAppStore();
+
+  // Dependency status
+  const depProjects = project.dependsOn
+    .map((depId) => allProjects.find((p) => p.id === depId))
+    .filter(Boolean) as RenovationProject[];
+  const hasUnmetDeps = depProjects.some((d) => d.status !== "completed");
+  const allDepsMet = depProjects.length > 0 && !hasUnmetDeps;
+
   return (
     <div className="border-t px-4 pb-4">
+      {/* Dependencies Section */}
+      {project.dependsOn.length > 0 && (
+        <div className="mt-3 mb-2">
+          <div className={cn(
+            "rounded-lg border px-3 py-2 text-sm",
+            allDepsMet
+              ? "bg-green-50 border-green-200"
+              : "bg-amber-50 border-amber-200"
+          )}>
+            <div className="flex items-center gap-2 mb-1.5">
+              {allDepsMet ? (
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              )}
+              <span className={cn("font-medium text-xs", allDepsMet ? "text-green-700" : "text-amber-700")}>
+                {allDepsMet ? "All dependencies met" : "Dependencies not yet complete"}
+              </span>
+            </div>
+            <div className="space-y-1 ml-6">
+              {depProjects.map((dep) => {
+                const isComplete = dep.status === "completed";
+                return (
+                  <div key={dep.id} className="flex items-center gap-2 text-xs">
+                    {isComplete ? (
+                      <CheckCircle2 className="w-3 h-3 text-green-600" />
+                    ) : (
+                      <Circle className="w-3 h-3 text-amber-500" />
+                    )}
+                    <span className={isComplete ? "text-green-700" : "text-amber-700"}>
+                      {dep.name}
+                    </span>
+                    {!isComplete && (
+                      <span className="text-amber-500 italic">Not yet complete</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top actions */}
       <div className="flex items-center gap-3 py-3 flex-wrap">
         <label className="text-sm font-medium">Status:</label>
@@ -1840,6 +1951,7 @@ function ProjectDialog({
   contractors: Contractor[];
   onSave: (p: RenovationProject) => void;
 }) {
+  const { projects: allProjects } = useAppStore();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("renovation");
   const [status, setStatus] = useState<ProjectStatus>("not_started");
@@ -1848,6 +1960,7 @@ function ProjectDialog({
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedContractorIds, setSelectedContractorIds] = useState<string[]>([]);
+  const [selectedDependsOn, setSelectedDependsOn] = useState<string[]>([]);
 
   useEffect(() => {
     if (project) {
@@ -1859,6 +1972,7 @@ function ProjectDialog({
       setEndDate(project.estimatedEndDate || "");
       setNotes(project.notes);
       setSelectedContractorIds(project.contractorIds);
+      setSelectedDependsOn(project.dependsOn || []);
     } else {
       setName("");
       setCategory("renovation");
@@ -1868,6 +1982,7 @@ function ProjectDialog({
       setEndDate("");
       setNotes("");
       setSelectedContractorIds([]);
+      setSelectedDependsOn([]);
     }
   }, [project, open]);
 
@@ -1885,6 +2000,7 @@ function ProjectDialog({
           estimatedEndDate: endDate || undefined,
           notes,
           contractorIds: selectedContractorIds,
+          dependsOn: selectedDependsOn,
           updatedAt: now,
         }
       : {
@@ -1904,7 +2020,7 @@ function ProjectDialog({
           notes,
           createdAt: now,
           updatedAt: now,
-          dependsOn: [],
+          dependsOn: selectedDependsOn,
         };
     onSave(p);
   };
@@ -1914,6 +2030,15 @@ function ProjectDialog({
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
+
+  const toggleDependency = (id: string) => {
+    setSelectedDependsOn((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // Other projects that this project can depend on (exclude self)
+  const availableDeps = allProjects.filter((p) => p.id !== project?.id);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -2009,6 +2134,28 @@ function ProjectDialog({
                         onChange={() => toggleContractor(c.id)}
                       />
                       {c.name} {c.company && `(${c.company})`} - {c.trade}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Dependencies */}
+            {availableDeps.length > 0 && (
+              <div>
+                <label className="text-sm font-medium">Dependencies (must complete first)</label>
+                <div className="mt-1 border rounded p-2 max-h-32 overflow-y-auto space-y-1">
+                  {availableDeps.map((dep) => (
+                    <label key={dep.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedDependsOn.includes(dep.id)}
+                        onChange={() => toggleDependency(dep.id)}
+                      />
+                      {dep.name}
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {STATUS_CONFIG[dep.status].label}
+                      </span>
                     </label>
                   ))}
                 </div>

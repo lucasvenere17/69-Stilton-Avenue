@@ -19,7 +19,7 @@
           "budgetItemId": "5691fb94-a74f-48b8-9b12-64facf8e343f",
           "notes": "",
           "createdAt": "2026-03-08T20:51:08.569Z",
-          "updatedAt": "2026-03-09T14:25:33.041Z"
+          "updatedAt": "2026-03-09T17:06:46.181Z"
         },
         {
           "id": "st-k2-island-counter-backsplash",
@@ -61,8 +61,10 @@
       "notes": "",
       "estimatedCost": 13000,
       "createdAt": "2026-03-08T20:51:08.569Z",
-      "updatedAt": "2026-03-09T16:12:47.403Z",
-      "dependsOn": ["f18f611d-226c-4b9d-9ae4-713d577977d5"]
+      "updatedAt": "2026-03-09T17:06:46.181Z",
+      "dependsOn": [
+        "f18f611d-226c-4b9d-9ae4-713d577977d5"
+      ]
     },
     {
       "id": "8839e507-37b8-40fc-922e-cabfe7190305",
@@ -140,7 +142,13 @@
       "estimatedCost": 12700,
       "createdAt": "2026-03-08T20:51:08.569Z",
       "updatedAt": "2026-03-08T20:51:08.569Z",
-      "dependsOn": ["b8127af7-099a-4fe7-b79c-4d4d9d003c1a", "e37f7b3c-96f4-4e47-a8e4-027c82277fcf", "e88bed94-b944-49f3-b51f-0e19a65c2cff", "4f3b9ca9-2baa-493d-acea-ef4deccee2cd", "9a511e4e-58d0-4d30-abd4-2b9c2d0ba414"]
+      "dependsOn": [
+        "b8127af7-099a-4fe7-b79c-4d4d9d003c1a",
+        "e37f7b3c-96f4-4e47-a8e4-027c82277fcf",
+        "e88bed94-b944-49f3-b51f-0e19a65c2cff",
+        "4f3b9ca9-2baa-493d-acea-ef4deccee2cd",
+        "9a511e4e-58d0-4d30-abd4-2b9c2d0ba414"
+      ]
     },
     {
       "id": "e37f7b3c-96f4-4e47-a8e4-027c82277fcf",
@@ -268,7 +276,9 @@
       "estimatedCost": 3560,
       "createdAt": "2026-03-08T20:51:08.569Z",
       "updatedAt": "2026-03-08T20:51:08.569Z",
-      "dependsOn": ["e37f7b3c-96f4-4e47-a8e4-027c82277fcf"]
+      "dependsOn": [
+        "e37f7b3c-96f4-4e47-a8e4-027c82277fcf"
+      ]
     },
     {
       "id": "4f3b9ca9-2baa-493d-acea-ef4deccee2cd",
@@ -367,7 +377,9 @@
       "estimatedCost": 0,
       "createdAt": "2026-03-08T20:51:08.569Z",
       "updatedAt": "2026-03-08T20:51:08.569Z",
-      "dependsOn": ["f18f611d-226c-4b9d-9ae4-713d577977d5"]
+      "dependsOn": [
+        "f18f611d-226c-4b9d-9ae4-713d577977d5"
+      ]
     }
   ],
   "contractors": []

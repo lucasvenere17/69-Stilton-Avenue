@@ -8,6 +8,8 @@ import type {
   RenovationProject,
   Contractor,
   EmailDraft,
+  GmailMessage,
+  EmailSuggestion,
 } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -24,6 +26,18 @@ import {
   Inbox,
   MessageSquare,
   PenSquare,
+  RefreshCw,
+  Link2,
+  DollarSign,
+  Calendar,
+  AlertCircle,
+  UserPlus,
+  Check,
+  XCircle,
+  ChevronDown,
+  ChevronUp,
+  Paperclip,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -174,6 +188,37 @@ function fillTemplate(
     .replace(/\{\{contractorName\}\}/g, contractorName || "[Contractor Name]");
 }
 
+// ── Suggestion type config ──
+const SUGGESTION_TYPE_CONFIG: Record<
+  EmailSuggestion["type"],
+  { label: string; icon: React.ReactNode; color: string; bg: string }
+> = {
+  quote_detected: {
+    label: "Quote Detected",
+    icon: <DollarSign className="w-4 h-4" />,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50",
+  },
+  schedule_update: {
+    label: "Schedule Update",
+    icon: <Calendar className="w-4 h-4" />,
+    color: "text-blue-700",
+    bg: "bg-blue-50",
+  },
+  status_change: {
+    label: "Status Change",
+    icon: <AlertCircle className="w-4 h-4" />,
+    color: "text-amber-700",
+    bg: "bg-amber-50",
+  },
+  new_contractor: {
+    label: "New Contractor",
+    icon: <UserPlus className="w-4 h-4" />,
+    color: "text-violet-700",
+    bg: "bg-violet-50",
+  },
+};
+
 // ── Main Page ──
 export default function CommunicationsPageWrapper() {
   return (
@@ -196,6 +241,13 @@ function CommunicationsPage() {
     deleteDraft,
     sendDraft,
     updateProject,
+    gmailStatus,
+    gmailMessages,
+    emailSuggestions,
+    checkGmailConnection,
+    syncGmail,
+    acceptSuggestion,
+    dismissSuggestion,
   } = useAppStore();
 
   const [filterProject, setFilterProject] = useState<string>("all");
@@ -205,6 +257,8 @@ function CommunicationsPage() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [editingDraft, setEditingDraft] = useState<EmailDraft | null>(null);
   const [addCommOpen, setAddCommOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"inbox" | "gmail" | "suggestions">("inbox");
 
   // Pre-selected from URL params (from "Draft Outreach" on projects page)
   const preselectedProjectId = searchParams.get("projectId") || "";
@@ -212,7 +266,8 @@ function CommunicationsPage() {
 
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+    checkGmailConnection();
+  }, [loadProjects, checkGmailConnection]);
 
   // Auto-open AI draft modal if navigated with params
   useEffect(() => {
@@ -258,6 +313,17 @@ function CommunicationsPage() {
     return result;
   }, [allComms, filterProject, filterType]);
 
+  const pendingSuggestions = useMemo(
+    () => emailSuggestions.filter((s) => s.status === "pending"),
+    [emailSuggestions]
+  );
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await syncGmail();
+    setSyncing(false);
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
@@ -301,49 +367,113 @@ function CommunicationsPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 items-center flex-wrap">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">Filters:</span>
-        </div>
-        <select
-          value={filterProject}
-          onChange={(e) => setFilterProject(e.target.value)}
-          className="text-sm border rounded-lg px-3 py-1.5"
+      {/* Gmail Connection Banner */}
+      <GmailConnectionBanner
+        status={gmailStatus}
+        syncing={syncing}
+        onSync={handleSync}
+      />
+
+      {/* Tab Switcher */}
+      <div className="flex gap-1 border-b">
+        <button
+          onClick={() => setActiveTab("inbox")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            activeTab === "inbox"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
         >
-          <option value="all">All Projects</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="text-sm border rounded-lg px-3 py-1.5"
-        >
-          <option value="all">All Types</option>
-          <option value="email">Email</option>
-          <option value="phone">Phone</option>
-          <option value="in_person">In Person</option>
-          <option value="note">Note</option>
-        </select>
-        {(filterProject !== "all" || filterType !== "all") && (
-          <button
-            onClick={() => {
-              setFilterProject("all");
-              setFilterType("all");
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground transition"
-          >
-            Clear filters
-          </button>
+          <span className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            Project Inbox ({filteredComms.length})
+          </span>
+        </button>
+        {gmailStatus.connected && (
+          <>
+            <button
+              onClick={() => setActiveTab("gmail")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "gmail"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Gmail ({gmailMessages.length})
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("suggestions")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "suggestions"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                AI Suggestions
+                {pendingSuggestions.length > 0 && (
+                  <span className="bg-violet-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                    {pendingSuggestions.length}
+                  </span>
+                )}
+              </span>
+            </button>
+          </>
         )}
       </div>
 
-      {/* Drafts Section */}
+      {/* Filters (for inbox tab) */}
+      {activeTab === "inbox" && (
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Filters:</span>
+          </div>
+          <select
+            value={filterProject}
+            onChange={(e) => setFilterProject(e.target.value)}
+            className="text-sm border rounded-lg px-3 py-1.5"
+          >
+            <option value="all">All Projects</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="text-sm border rounded-lg px-3 py-1.5"
+          >
+            <option value="all">All Types</option>
+            <option value="email">Email</option>
+            <option value="phone">Phone</option>
+            <option value="in_person">In Person</option>
+            <option value="note">Note</option>
+          </select>
+          {(filterProject !== "all" || filterType !== "all") && (
+            <button
+              onClick={() => {
+                setFilterProject("all");
+                setFilterType("all");
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground transition"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Drafts Section (always visible) */}
       {drafts.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -385,75 +515,31 @@ function CommunicationsPage() {
         </div>
       )}
 
-      {/* Communications List */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-          Inbox ({filteredComms.length})
-        </h3>
-        {filteredComms.length === 0 ? (
-          <div className="text-center py-12 border rounded-lg bg-white">
-            <MessageSquare className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No communications yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Log a communication or compose a new email to get started.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {filteredComms.map((comm) => {
-              const typeCfg = COMM_TYPE_CONFIG[comm.type] || COMM_TYPE_CONFIG.note;
-              const contractor = comm.contractorId
-                ? contractors.find((c) => c.id === comm.contractorId)
-                : null;
+      {/* Tab Content */}
+      {activeTab === "inbox" && (
+        <ProjectInboxSection
+          filteredComms={filteredComms}
+          contractors={contractors}
+        />
+      )}
 
-              return (
-                <div
-                  key={comm.id}
-                  className="flex items-start gap-3 p-3 bg-white border rounded-lg text-sm hover:bg-accent/30 transition"
-                >
-                  <div
-                    className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                      typeCfg.bg,
-                      typeCfg.color
-                    )}
-                  >
-                    {typeCfg.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{comm.summary}</span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium"
-                      >
-                        {comm.projectName}
-                      </span>
-                      <span>{new Date(comm.date).toLocaleDateString()}</span>
-                      {contractor && (
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          {contractor.name}
-                        </span>
-                      )}
-                      <span
-                        className={cn(
-                          "px-1.5 py-0.5 rounded text-xs font-medium",
-                          typeCfg.bg,
-                          typeCfg.color
-                        )}
-                      >
-                        {typeCfg.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {activeTab === "gmail" && gmailStatus.connected && (
+        <GmailInboxSection
+          messages={gmailMessages}
+          projects={projects}
+          contractors={contractors}
+          onSync={handleSync}
+          syncing={syncing}
+        />
+      )}
+
+      {activeTab === "suggestions" && gmailStatus.connected && (
+        <SuggestionsSection
+          suggestions={emailSuggestions}
+          onAccept={acceptSuggestion}
+          onDismiss={dismissSuggestion}
+        />
+      )}
 
       {/* Compose / Edit Draft Modal */}
       <ComposeModal
@@ -462,6 +548,7 @@ function CommunicationsPage() {
         draft={editingDraft}
         projects={projects}
         contractors={contractors}
+        gmailConnected={gmailStatus.connected}
         onSaveDraft={(draft) => {
           if (drafts.find((d) => d.id === draft.id)) {
             updateDraft(draft);
@@ -524,6 +611,437 @@ function CommunicationsPage() {
   );
 }
 
+// ── Gmail Connection Banner ──
+function GmailConnectionBanner({
+  status,
+  syncing,
+  onSync,
+}: {
+  status: { connected: boolean; email?: string; lastSynced?: string };
+  syncing: boolean;
+  onSync: () => void;
+}) {
+  if (status.connected) {
+    return (
+      <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+            <Mail className="w-4 h-4 text-emerald-700" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-emerald-800">
+              Gmail Connected
+            </div>
+            <div className="text-xs text-emerald-600">
+              {status.email}
+              {status.lastSynced && (
+                <> &middot; Last synced: {new Date(status.lastSynced).toLocaleString()}</>
+              )}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onSync}
+          disabled={syncing}
+          className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50"
+        >
+          <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+          {syncing ? "Syncing..." : "Sync Now"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+          <Mail className="w-4 h-4 text-gray-500" />
+        </div>
+        <div>
+          <div className="text-sm font-medium text-gray-700">
+            Gmail Not Connected
+          </div>
+          <div className="text-xs text-gray-500">
+            Connect your Gmail to sync emails, send messages, and get AI suggestions from contractor conversations.
+          </div>
+        </div>
+      </div>
+      <a
+        href="/api/auth/google"
+        className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition"
+      >
+        <ExternalLink className="w-4 h-4" />
+        Connect Gmail
+      </a>
+    </div>
+  );
+}
+
+// ── Project Inbox Section ──
+function ProjectInboxSection({
+  filteredComms,
+  contractors,
+}: {
+  filteredComms: (ProjectCommunication & { projectId: string; projectName: string })[];
+  contractors: Contractor[];
+}) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        Project Communications ({filteredComms.length})
+      </h3>
+      {filteredComms.length === 0 ? (
+        <div className="text-center py-12 border rounded-lg bg-white">
+          <MessageSquare className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+          <p className="text-muted-foreground">No communications yet.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Log a communication or compose a new email to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {filteredComms.map((comm) => {
+            const typeCfg = COMM_TYPE_CONFIG[comm.type] || COMM_TYPE_CONFIG.note;
+            const contractor = comm.contractorId
+              ? contractors.find((c) => c.id === comm.contractorId)
+              : null;
+
+            return (
+              <div
+                key={comm.id}
+                className="flex items-start gap-3 p-3 bg-white border rounded-lg text-sm hover:bg-accent/30 transition"
+              >
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                    typeCfg.bg,
+                    typeCfg.color
+                  )}
+                >
+                  {typeCfg.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{comm.summary}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium"
+                    >
+                      {comm.projectName}
+                    </span>
+                    <span>{new Date(comm.date).toLocaleDateString()}</span>
+                    {contractor && (
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        {contractor.name}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "px-1.5 py-0.5 rounded text-xs font-medium",
+                        typeCfg.bg,
+                        typeCfg.color
+                      )}
+                    >
+                      {typeCfg.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Gmail Inbox Section ──
+function GmailInboxSection({
+  messages,
+  contractors,
+  onSync,
+  syncing,
+}: {
+  messages: GmailMessage[];
+  projects: RenovationProject[];
+  contractors: Contractor[];
+  onSync: () => void;
+  syncing: boolean;
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (messages.length === 0) {
+    return (
+      <div className="text-center py-12 border rounded-lg bg-white">
+        <Mail className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+        <p className="text-muted-foreground">No synced emails yet.</p>
+        <p className="text-xs text-muted-foreground mt-1 mb-4">
+          Click &quot;Sync Now&quot; to fetch renovation-related emails from Gmail.
+        </p>
+        <button
+          onClick={onSync}
+          disabled={syncing}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+        >
+          <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+          {syncing ? "Syncing..." : "Sync Now"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        Gmail Messages ({messages.length})
+      </h3>
+      <div className="space-y-1">
+        {messages.map((email) => {
+          const isExpanded = expandedId === email.id;
+          const matchedContractor = contractors.find(
+            (c) => c.email && c.email.toLowerCase() === email.fromEmail.toLowerCase()
+          );
+          const hasQuoteInfo = /\$[\d,]+/.test(email.body);
+
+          return (
+            <div
+              key={email.id}
+              className={cn(
+                "bg-white border rounded-lg text-sm transition",
+                !email.isRead && "border-blue-200 bg-blue-50/30",
+                hasQuoteInfo && "border-l-4 border-l-emerald-400"
+              )}
+            >
+              <div
+                className="flex items-start gap-3 p-3 cursor-pointer hover:bg-accent/30 transition"
+                onClick={() => setExpandedId(isExpanded ? null : email.id)}
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <Mail className={cn("w-4 h-4", !email.isRead ? "text-blue-700" : "text-blue-400")} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn("font-medium", !email.isRead && "font-bold")}>
+                      {email.from}
+                    </span>
+                    {matchedContractor && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 text-xs font-medium">
+                        <Link2 className="w-3 h-3" />
+                        {matchedContractor.trade}
+                      </span>
+                    )}
+                    {email.hasAttachments && (
+                      <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+                    )}
+                    {hasQuoteInfo && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs font-medium">
+                        <DollarSign className="w-3 h-3" />
+                        Quote
+                      </span>
+                    )}
+                  </div>
+                  <div className={cn("truncate mt-0.5", !email.isRead ? "font-semibold" : "text-foreground")}>
+                    {email.subject}
+                  </div>
+                  {!isExpanded && (
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {email.body.slice(0, 120)}...
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatEmailDate(email.date)}
+                  </span>
+                  {isExpanded ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="px-3 pb-3 border-t mx-3 pt-3">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+                    <span>From: {email.from} &lt;{email.fromEmail}&gt;</span>
+                    <span>To: {email.to}</span>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-sm whitespace-pre-wrap font-mono text-gray-700 max-h-64 overflow-y-auto">
+                    {email.body}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatEmailDate(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } else if (diffDays === 1) {
+      return "Yesterday";
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: "short" });
+    } else {
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+  } catch {
+    return dateStr;
+  }
+}
+
+// ── Suggestions Section ──
+function SuggestionsSection({
+  suggestions,
+  onAccept,
+  onDismiss,
+}: {
+  suggestions: EmailSuggestion[];
+  onAccept: (id: string) => void;
+  onDismiss: (id: string) => void;
+}) {
+  const pending = suggestions.filter((s) => s.status === "pending");
+  const resolved = suggestions.filter((s) => s.status !== "pending");
+
+  return (
+    <div className="space-y-4">
+      {/* Pending */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          Pending Suggestions ({pending.length})
+        </h3>
+        {pending.length === 0 ? (
+          <div className="text-center py-8 border rounded-lg bg-white">
+            <Sparkles className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">No pending suggestions.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sync your Gmail to detect quotes, schedules, and status updates.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {pending.map((sug) => {
+              const config = SUGGESTION_TYPE_CONFIG[sug.type];
+              return (
+                <div
+                  key={sug.id}
+                  className="flex items-start gap-3 p-3 bg-white border rounded-lg text-sm"
+                >
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                      config.bg,
+                      config.color
+                    )}
+                  >
+                    {config.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("text-xs font-medium px-1.5 py-0.5 rounded", config.bg, config.color)}>
+                        {config.label}
+                      </span>
+                    </div>
+                    <div className="font-medium mt-1">{sug.description}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {sug.suggestedAction}
+                    </div>
+                    {sug.detectedAmount && (
+                      <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded">
+                        <DollarSign className="w-3 h-3" />
+                        ${sug.detectedAmount.toLocaleString()}
+                      </div>
+                    )}
+                    {sug.detectedDate && (
+                      <div className="inline-flex items-center gap-1 mt-1 ml-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded">
+                        <Calendar className="w-3 h-3" />
+                        {sug.detectedDate}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      onClick={() => onAccept(sug.id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100 transition"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => onDismiss(sug.id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 transition"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Resolved */}
+      {resolved.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Resolved ({resolved.length})
+          </h3>
+          <div className="space-y-1">
+            {resolved.map((sug) => {
+              const config = SUGGESTION_TYPE_CONFIG[sug.type];
+              return (
+                <div
+                  key={sug.id}
+                  className="flex items-center gap-3 p-2.5 bg-gray-50 border rounded-lg text-sm opacity-60"
+                >
+                  <div
+                    className={cn(
+                      "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
+                      config.bg,
+                      config.color
+                    )}
+                  >
+                    {config.icon}
+                  </div>
+                  <div className="flex-1 min-w-0 truncate text-xs">
+                    {sug.description}
+                  </div>
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-1.5 py-0.5 rounded",
+                      sug.status === "accepted"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-gray-100 text-gray-500"
+                    )}
+                  >
+                    {sug.status === "accepted" ? "Accepted" : "Dismissed"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Compose Modal ──
 function ComposeModal({
   open,
@@ -531,6 +1049,7 @@ function ComposeModal({
   draft,
   projects,
   contractors,
+  gmailConnected,
   onSaveDraft,
   onSend,
 }: {
@@ -539,6 +1058,7 @@ function ComposeModal({
   draft: EmailDraft | null;
   projects: RenovationProject[];
   contractors: Contractor[];
+  gmailConnected: boolean;
   onSaveDraft: (draft: EmailDraft) => void;
   onSend: (draft: EmailDraft) => void;
 }) {
@@ -596,6 +1116,13 @@ function ComposeModal({
               <X className="w-5 h-5" />
             </Dialog.Close>
           </div>
+
+          {gmailConnected && (
+            <div className="mx-4 mt-3 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-700 flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5" />
+              This email will be sent via your connected Gmail account.
+            </div>
+          )}
 
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -691,7 +1218,7 @@ function ComposeModal({
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition"
             >
               <Send className="w-4 h-4" />
-              Send
+              {gmailConnected ? "Send via Gmail" : "Send"}
             </button>
           </div>
         </Dialog.Content>

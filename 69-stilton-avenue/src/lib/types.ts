@@ -209,6 +209,42 @@ export interface ProjectTrackerData {
   contractors: Contractor[];
 }
 
+// ── Gmail Integration Types ──
+
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  fromEmail: string;
+  to: string;
+  subject: string;
+  body: string;
+  date: string;
+  isRead: boolean;
+  labels: string[];
+  hasAttachments: boolean;
+}
+
+export interface EmailSuggestion {
+  id: string;
+  emailId: string;
+  type: "quote_detected" | "schedule_update" | "status_change" | "new_contractor";
+  description: string;
+  suggestedAction: string;
+  projectId?: string;
+  contractorId?: string;
+  detectedAmount?: number;
+  detectedDate?: string;
+  status: "pending" | "accepted" | "dismissed";
+  createdAt: string;
+}
+
+export interface GmailConnectionStatus {
+  connected: boolean;
+  email?: string;
+  lastSynced?: string;
+}
+
 export interface Scenario {
   id: string;
   name: string;

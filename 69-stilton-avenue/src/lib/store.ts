@@ -8,6 +8,9 @@ import type {
   Contractor,
   EmailDraft,
   ProjectCommunication,
+  GmailMessage,
+  EmailSuggestion,
+  GmailConnectionStatus,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -67,6 +70,16 @@ interface AppState {
   updateDraft: (draft: EmailDraft) => void;
   deleteDraft: (id: string) => void;
   sendDraft: (draft: EmailDraft) => Promise<void>;
+
+  // Gmail Integration
+  gmailStatus: GmailConnectionStatus;
+  gmailMessages: GmailMessage[];
+  emailSuggestions: EmailSuggestion[];
+  checkGmailConnection: () => Promise<void>;
+  syncGmail: () => Promise<void>;
+  sendGmailEmail: (to: string, subject: string, body: string, projectId?: string, contractorId?: string) => Promise<boolean>;
+  acceptSuggestion: (id: string) => void;
+  dismissSuggestion: (id: string) => void;
 }
 
 const createEmptyScenario = (name: string): Scenario => ({
@@ -547,9 +560,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   sendDraft: async (draft) => {
-    const { projects, updateProject } = get();
+    const { projects, updateProject, gmailStatus, sendGmailEmail } = get();
     const project = projects.find((p) => p.id === draft.projectId);
     if (!project) return;
+
+    // If Gmail is connected, actually send via Gmail
+    if (gmailStatus.connected && draft.to) {
+      const sent = await sendGmailEmail(draft.to, draft.subject, draft.body, draft.projectId, draft.contractorId);
+      if (sent) {
+        set((s) => ({ drafts: s.drafts.filter((d) => d.id !== draft.id) }));
+        return;
+      }
+      // If Gmail send fails, fall through to the log-only approach
+    }
 
     const comm: ProjectCommunication = {
       id: uuidv4(),
@@ -566,5 +589,97 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Mark draft as sent and remove from drafts
     set((s) => ({ drafts: s.drafts.filter((d) => d.id !== draft.id) }));
+  },
+
+  // ── Gmail Integration ──
+  gmailStatus: { connected: false },
+  gmailMessages: [],
+  emailSuggestions: [],
+
+  checkGmailConnection: async () => {
+    try {
+      const res = await fetch("/api/auth/google/status");
+      const data = await res.json();
+      set({
+        gmailStatus: {
+          connected: data.connected,
+          email: data.email,
+          lastSynced: get().gmailStatus.lastSynced,
+        },
+      });
+    } catch {
+      set({ gmailStatus: { connected: false } });
+    }
+  },
+
+  syncGmail: async () => {
+    try {
+      const res = await fetch("/api/gmail/sync");
+      if (!res.ok) throw new Error("Sync failed");
+      const data = await res.json();
+      set({
+        gmailMessages: data.emails || [],
+        emailSuggestions: data.suggestions || [],
+        gmailStatus: {
+          ...get().gmailStatus,
+          lastSynced: data.lastSynced || new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("Gmail sync error:", err);
+    }
+  },
+
+  sendGmailEmail: async (to, subject, body, projectId?, contractorId?) => {
+    try {
+      const res = await fetch("/api/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, body }),
+      });
+
+      if (!res.ok) return false;
+
+      // Log communication on the project
+      if (projectId) {
+        const { projects, updateProject } = get();
+        const project = projects.find((p) => p.id === projectId);
+        if (project) {
+          const comm: ProjectCommunication = {
+            id: uuidv4(),
+            date: new Date().toISOString(),
+            type: "email",
+            summary: `Email sent via Gmail to ${to}: ${subject}`,
+            contractorId,
+          };
+          await updateProject({
+            ...project,
+            communications: [...project.communications, comm],
+          });
+        }
+      }
+
+      set({ toastMessage: `Email sent to ${to} via Gmail!` });
+      setTimeout(() => set({ toastMessage: null }), 4000);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  acceptSuggestion: (id) => {
+    set((s) => ({
+      emailSuggestions: s.emailSuggestions.map((sug) =>
+        sug.id === id ? { ...sug, status: "accepted" as const } : sug
+      ),
+    }));
+  },
+
+  dismissSuggestion: (id) => {
+    set((s) => ({
+      emailSuggestions: s.emailSuggestions.map((sug) =>
+        sug.id === id ? { ...sug, status: "dismissed" as const } : sug
+      ),
+    }));
   },
 }));

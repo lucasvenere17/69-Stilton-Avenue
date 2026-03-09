@@ -10,6 +10,7 @@ import type {
   EmailDraft,
   GmailMessage,
   EmailSuggestion,
+  LinkedEmail,
 } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -244,10 +245,12 @@ function CommunicationsPage() {
     gmailStatus,
     gmailMessages,
     emailSuggestions,
+    linkedEmails,
     checkGmailConnection,
     syncGmail,
     acceptSuggestion,
     dismissSuggestion,
+    linkEmailToProject,
   } = useAppStore();
 
   const [filterProject, setFilterProject] = useState<string>("all");
@@ -312,6 +315,18 @@ function CommunicationsPage() {
     }
     return result;
   }, [allComms, filterProject, filterType]);
+
+  // Compute inbox count: manual comms (without Gmail-linked ones) + linked emails
+  const inboxCount = useMemo(() => {
+    const manualCommsCount = filteredComms.filter((c) => !c.summary.includes("[Gmail:")).length;
+    const linkedInFilterCount = linkedEmails.filter((le) => {
+      if (filterProject !== "all" && le.projectId !== filterProject) return false;
+      const email = gmailMessages.find((e) => e.id === le.emailId);
+      const project = projects.find((p) => p.id === le.projectId);
+      return !!email && !!project;
+    }).length;
+    return manualCommsCount + linkedInFilterCount;
+  }, [filteredComms, linkedEmails, gmailMessages, projects, filterProject]);
 
   const pendingSuggestions = useMemo(
     () => emailSuggestions.filter((s) => s.status === "pending"),
@@ -387,7 +402,7 @@ function CommunicationsPage() {
         >
           <span className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
-            Project Inbox ({filteredComms.length})
+            Project Inbox ({inboxCount})
           </span>
         </button>
         {gmailStatus.connected && (
@@ -520,6 +535,10 @@ function CommunicationsPage() {
         <ProjectInboxSection
           filteredComms={filteredComms}
           contractors={contractors}
+          linkedEmails={linkedEmails}
+          gmailMessages={gmailMessages}
+          projects={projects}
+          filterProject={filterProject}
         />
       )}
 
@@ -528,8 +547,10 @@ function CommunicationsPage() {
           messages={gmailMessages}
           projects={projects}
           contractors={contractors}
+          linkedEmails={linkedEmails}
           onSync={handleSync}
           syncing={syncing}
+          onLinkEmail={linkEmailToProject}
         />
       )}
 
@@ -682,16 +703,56 @@ function GmailConnectionBanner({
 function ProjectInboxSection({
   filteredComms,
   contractors,
+  linkedEmails,
+  gmailMessages,
+  projects,
+  filterProject,
 }: {
   filteredComms: (ProjectCommunication & { projectId: string; projectName: string })[];
   contractors: Contractor[];
+  linkedEmails: LinkedEmail[];
+  gmailMessages: GmailMessage[];
+  projects: RenovationProject[];
+  filterProject: string;
 }) {
+  // Build linked Gmail entries to merge into the inbox
+  const linkedGmailEntries = useMemo(() => {
+    return linkedEmails
+      .map((le) => {
+        const email = gmailMessages.find((e) => e.id === le.emailId);
+        const project = projects.find((p) => p.id === le.projectId);
+        if (!email || !project) return null;
+        if (filterProject !== "all" && le.projectId !== filterProject) return null;
+        const subTask = le.subTaskId
+          ? project.subTasks.find((st) => st.id === le.subTaskId)
+          : null;
+        return {
+          id: `gmail-linked-${le.emailId}`,
+          date: email.date ? new Date(email.date).toISOString() : le.linkedAt,
+          type: "email" as const,
+          summary: `${email.subject} (from ${email.from})${subTask ? ` [${subTask.title}]` : ""}`,
+          projectId: le.projectId,
+          projectName: project.name,
+          isGmailLinked: true,
+          emailFrom: email.from,
+        };
+      })
+      .filter(Boolean) as (ProjectCommunication & { projectId: string; projectName: string; isGmailLinked: boolean; emailFrom: string })[];
+  }, [linkedEmails, gmailMessages, projects, filterProject]);
+
+  // Merge and deduplicate: exclude comms that came from linkEmailToProject (contain [Gmail: ...])
+  const manualComms = filteredComms.filter((c) => !c.summary.includes("[Gmail:"));
+  const allItems = [...manualComms, ...linkedGmailEntries].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+  const totalCount = allItems.length;
+
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-        Project Communications ({filteredComms.length})
+        Project Communications ({totalCount})
       </h3>
-      {filteredComms.length === 0 ? (
+      {totalCount === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-white">
           <MessageSquare className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No communications yet.</p>
@@ -701,7 +762,8 @@ function ProjectInboxSection({
         </div>
       ) : (
         <div className="space-y-1">
-          {filteredComms.map((comm) => {
+          {allItems.map((comm) => {
+            const isGmailLinked = "isGmailLinked" in comm && (comm as { isGmailLinked: boolean }).isGmailLinked;
             const typeCfg = COMM_TYPE_CONFIG[comm.type] || COMM_TYPE_CONFIG.note;
             const contractor = comm.contractorId
               ? contractors.find((c) => c.id === comm.contractorId)
@@ -715,15 +777,23 @@ function ProjectInboxSection({
                 <div
                   className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                    typeCfg.bg,
-                    typeCfg.color
+                    isGmailLinked ? "bg-emerald-50 text-emerald-700" : typeCfg.bg,
+                    !isGmailLinked && typeCfg.color
                   )}
                 >
-                  {typeCfg.icon}
+                  {isGmailLinked ? <Mail className="w-4 h-4" /> : typeCfg.icon}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">{comm.summary}</span>
+                    <span className="font-medium">
+                      {comm.summary.replace(/\s*\[Gmail:\s*[^\]]+\]/, "")}
+                    </span>
+                    {isGmailLinked && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs font-medium">
+                        <Mail className="w-3 h-3" />
+                        Gmail
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                     <span
@@ -761,17 +831,25 @@ function ProjectInboxSection({
 // ── Gmail Inbox Section ──
 function GmailInboxSection({
   messages,
+  projects,
   contractors,
+  linkedEmails,
   onSync,
   syncing,
+  onLinkEmail,
 }: {
   messages: GmailMessage[];
   projects: RenovationProject[];
   contractors: Contractor[];
+  linkedEmails: LinkedEmail[];
   onSync: () => void;
   syncing: boolean;
+  onLinkEmail: (emailId: string, projectId: string, subTaskId?: string) => Promise<void>;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [linkDropdownId, setLinkDropdownId] = useState<string | null>(null);
+  const [linkProjectId, setLinkProjectId] = useState<string>("");
+  const [linkSubTaskId, setLinkSubTaskId] = useState<string>("");
 
   if (messages.length === 0) {
     return (
@@ -793,6 +871,24 @@ function GmailInboxSection({
     );
   }
 
+  const openLinkDropdown = (emailId: string, autoProjectId?: string, autoSubTaskId?: string) => {
+    setLinkDropdownId(emailId);
+    setLinkProjectId(autoProjectId || "");
+    setLinkSubTaskId(autoSubTaskId || "");
+  };
+
+  const handleLink = async (emailId: string) => {
+    if (!linkProjectId) return;
+    await onLinkEmail(emailId, linkProjectId, linkSubTaskId || undefined);
+    setLinkDropdownId(null);
+    setLinkProjectId("");
+    setLinkSubTaskId("");
+  };
+
+  const selectedProject = linkProjectId
+    ? projects.find((p) => p.id === linkProjectId)
+    : null;
+
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -805,6 +901,23 @@ function GmailInboxSection({
             (c) => c.email && c.email.toLowerCase() === email.fromEmail.toLowerCase()
           );
           const hasQuoteInfo = /\$[\d,]+/.test(email.body);
+          const existingLink = linkedEmails.find((le) => le.emailId === email.id);
+          const linkedProject = existingLink
+            ? projects.find((p) => p.id === existingLink.projectId)
+            : null;
+          const linkedSubTask = existingLink?.subTaskId && linkedProject
+            ? linkedProject.subTasks.find((st) => st.id === existingLink.subTaskId)
+            : null;
+
+          // Auto-match info from sync
+          const autoMatchProject = email.matchedProjectId
+            ? projects.find((p) => p.id === email.matchedProjectId)
+            : null;
+          const autoMatchSubTask = email.matchedSubTaskId && autoMatchProject
+            ? autoMatchProject.subTasks.find((st) => st.id === email.matchedSubTaskId)
+            : null;
+
+          const isLinkDropdownOpen = linkDropdownId === email.id;
 
           return (
             <div
@@ -812,7 +925,8 @@ function GmailInboxSection({
               className={cn(
                 "bg-white border rounded-lg text-sm transition",
                 !email.isRead && "border-blue-200 bg-blue-50/30",
-                hasQuoteInfo && "border-l-4 border-l-emerald-400"
+                hasQuoteInfo && "border-l-4 border-l-emerald-400",
+                existingLink && "border-l-4 border-l-emerald-500"
               )}
             >
               <div
@@ -846,7 +960,30 @@ function GmailInboxSection({
                   <div className={cn("truncate mt-0.5", !email.isRead ? "font-semibold" : "text-foreground")}>
                     {email.subject}
                   </div>
-                  {!isExpanded && (
+
+                  {/* Auto-match badge */}
+                  {!existingLink && autoMatchProject && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-xs font-medium">
+                        <Sparkles className="w-3 h-3" />
+                        Matched: {autoMatchProject.name}
+                        {autoMatchSubTask && ` > ${autoMatchSubTask.title}`}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Linked badge */}
+                  {existingLink && linkedProject && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs font-medium">
+                        <Check className="w-3 h-3" />
+                        Linked to: {linkedProject.name}
+                        {linkedSubTask && ` > ${linkedSubTask.title}`}
+                      </span>
+                    </div>
+                  )}
+
+                  {!isExpanded && !existingLink && !autoMatchProject && (
                     <div className="text-xs text-muted-foreground mt-0.5 truncate">
                       {email.body.slice(0, 120)}...
                     </div>
@@ -873,6 +1010,118 @@ function GmailInboxSection({
                   <div className="bg-gray-50 rounded-lg p-3 text-sm whitespace-pre-wrap font-mono text-gray-700 max-h-64 overflow-y-auto">
                     {email.body}
                   </div>
+
+                  {/* Link to Project actions */}
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    {existingLink && linkedProject ? (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium">
+                          <Check className="w-3.5 h-3.5" />
+                          Linked to: {linkedProject.name}
+                          {linkedSubTask && ` > ${linkedSubTask.title}`}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openLinkDropdown(email.id, existingLink.projectId, existingLink.subTaskId);
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground transition underline"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openLinkDropdown(email.id, email.matchedProjectId, email.matchedSubTaskId);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        Link to Project
+                      </button>
+                    )}
+
+                    {/* Quick confirm auto-match */}
+                    {!existingLink && autoMatchProject && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await onLinkEmail(email.id, autoMatchProject.id, autoMatchSubTask?.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 transition"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Confirm Match
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Link dropdown */}
+                  {isLinkDropdownOpen && (
+                    <div className="mt-2 p-3 border rounded-lg bg-gray-50 space-y-2">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Project</label>
+                        <select
+                          value={linkProjectId}
+                          onChange={(e) => {
+                            setLinkProjectId(e.target.value);
+                            setLinkSubTaskId("");
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full border rounded px-2.5 py-1.5 text-sm mt-1"
+                        >
+                          <option value="">Select project...</option>
+                          {projects.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {selectedProject && selectedProject.subTasks.length > 0 && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">Sub-task (optional)</label>
+                          <select
+                            value={linkSubTaskId}
+                            onChange={(e) => setLinkSubTaskId(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full border rounded px-2.5 py-1.5 text-sm mt-1"
+                          >
+                            <option value="">All / General</option>
+                            {selectedProject.subTasks.map((st) => (
+                              <option key={st.id} value={st.id}>
+                                {st.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await handleLink(email.id);
+                          }}
+                          disabled={!linkProjectId}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Link
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLinkDropdownId(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg border text-xs font-medium hover:bg-accent transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

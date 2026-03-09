@@ -8,13 +8,23 @@ import {
 import fs from "fs";
 import path from "path";
 
+interface SubTaskData {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface ProjectData {
+  id: string;
+  name: string;
+  category: string;
+  contractorIds: string[];
+  communications: Array<Record<string, unknown>>;
+  subTasks: SubTaskData[];
+}
+
 interface ProjectsData {
-  projects: Array<{
-    id: string;
-    name: string;
-    contractorIds: string[];
-    communications: Array<Record<string, unknown>>;
-  }>;
+  projects: ProjectData[];
   contractors: Array<{
     id: string;
     name: string;
@@ -32,6 +42,137 @@ function loadProjectsData(): ProjectsData {
   } catch {
     return { projects: [], contractors: [] };
   }
+}
+
+// ── Project-level keyword matching rules ──
+interface MatchRule {
+  keywords: string[];
+  projectCategory: string; // matches against project.category or project.name (lowercased)
+}
+
+const PROJECT_MATCH_RULES: MatchRule[] = [
+  { keywords: ["kitchen"], projectCategory: "kitchen" },
+  { keywords: ["living room", "wall unit"], projectCategory: "living room" },
+  { keywords: ["paint", "painting", "door handles"], projectCategory: "throughout house" },
+  { keywords: ["master bedroom", "closet", "walk-in", "wic", "ikea closet"], projectCategory: "master bedroom" },
+  { keywords: ["ensuite", "bathroom", "vanity", "showerhead", "shower"], projectCategory: "ensuite" },
+  { keywords: ["mudroom", "mud room"], projectCategory: "mudroom" },
+  { keywords: ["laundry"], projectCategory: "laundry room" },
+  { keywords: ["powder room", "wallpaper"], projectCategory: "powder room" },
+];
+
+// ── Sub-task level keyword matching rules ──
+interface SubTaskMatchRule {
+  keywords: string[];
+  projectCategory: string;
+  subTaskTitleIncludes: string; // partial match on sub-task title (lowercased)
+}
+
+const SUBTASK_MATCH_RULES: SubTaskMatchRule[] = [
+  // Kitchen
+  { keywords: ["cabinet resurfacing", "cabinets"], projectCategory: "kitchen", subTaskTitleIncludes: "cabinet resurfacing" },
+  { keywords: ["island", "counter", "backsplash"], projectCategory: "kitchen", subTaskTitleIncludes: "island" },
+  { keywords: ["hood fan", "slats"], projectCategory: "kitchen", subTaskTitleIncludes: "hood fan" },
+  // Living Room
+  { keywords: ["wall unit"], projectCategory: "living room", subTaskTitleIncludes: "wall unit" },
+  // Throughout House
+  { keywords: ["painting"], projectCategory: "throughout house", subTaskTitleIncludes: "painting" },
+  { keywords: ["door handles"], projectCategory: "throughout house", subTaskTitleIncludes: "door handles" },
+  // Master Bedroom
+  { keywords: ["demo", "demolition", "his and hers"], projectCategory: "master bedroom", subTaskTitleIncludes: "demo" },
+  { keywords: ["construct closet", "taping", "sanding", "half wall", "ensuite wall"], projectCategory: "master bedroom", subTaskTitleIncludes: "construct closet" },
+  { keywords: ["ikea closet"], projectCategory: "master bedroom", subTaskTitleIncludes: "ikea closet" },
+  { keywords: ["closet lighting", "electrical"], projectCategory: "master bedroom", subTaskTitleIncludes: "closet lighting" },
+  { keywords: ["window"], projectCategory: "master bedroom", subTaskTitleIncludes: "window" },
+  // Ensuite
+  { keywords: ["vanity"], projectCategory: "ensuite", subTaskTitleIncludes: "vanity" },
+  { keywords: ["showerhead", "shower head"], projectCategory: "ensuite", subTaskTitleIncludes: "showerhead" },
+  // Mudroom
+  { keywords: ["built-in", "built in"], projectCategory: "mudroom", subTaskTitleIncludes: "built in" },
+  // Laundry
+  { keywords: ["built-in", "built in"], projectCategory: "laundry room", subTaskTitleIncludes: "built-in" },
+  // Powder Room
+  { keywords: ["wallpaper"], projectCategory: "powder room", subTaskTitleIncludes: "wallpaper" },
+];
+
+interface MatchResult {
+  projectId: string;
+  subTaskId?: string;
+  score: number;
+}
+
+function matchEmailToProject(
+  subject: string,
+  body: string,
+  fromEmail: string,
+  projects: ProjectData[],
+  contractorEmails: Map<string, { id: string; name: string }>
+): MatchResult | null {
+  const text = `${subject} ${body}`.toLowerCase();
+  const results: MatchResult[] = [];
+
+  // 1. Contractor email match (high priority)
+  const fromContractor = contractorEmails.get(fromEmail.toLowerCase());
+  if (fromContractor) {
+    const project = projects.find((p) =>
+      p.contractorIds.includes(fromContractor.id)
+    );
+    if (project) {
+      results.push({ projectId: project.id, score: 100 });
+    }
+  }
+
+  // 2. Project-level keyword matching
+  for (const project of projects) {
+    const projectCat = project.category.toLowerCase();
+    const projectName = project.name.toLowerCase();
+    let projectScore = 0;
+    let matchedProjectByRule = false;
+
+    for (const rule of PROJECT_MATCH_RULES) {
+      if (projectCat.includes(rule.projectCategory) || projectName.includes(rule.projectCategory)) {
+        const hits = rule.keywords.filter((kw) => text.includes(kw)).length;
+        if (hits > 0) {
+          projectScore += hits * 10;
+          matchedProjectByRule = true;
+        }
+      }
+    }
+
+    if (!matchedProjectByRule) continue;
+
+    // 3. Sub-task level matching (adds to the score)
+    let bestSubTaskId: string | undefined;
+    let bestSubTaskScore = 0;
+
+    for (const rule of SUBTASK_MATCH_RULES) {
+      if (!projectCat.includes(rule.projectCategory) && !projectName.includes(rule.projectCategory)) continue;
+
+      const hits = rule.keywords.filter((kw) => text.includes(kw)).length;
+      if (hits > 0) {
+        // Find the matching sub-task
+        const subTask = project.subTasks.find((st) =>
+          st.title.toLowerCase().includes(rule.subTaskTitleIncludes)
+        );
+        if (subTask && hits > bestSubTaskScore) {
+          bestSubTaskScore = hits;
+          bestSubTaskId = subTask.id;
+        }
+      }
+    }
+
+    results.push({
+      projectId: project.id,
+      subTaskId: bestSubTaskId,
+      score: projectScore + bestSubTaskScore * 5,
+    });
+  }
+
+  if (results.length === 0) return null;
+
+  // Return the best match (highest score)
+  results.sort((a, b) => b.score - a.score);
+  return results[0];
 }
 
 export async function GET() {
@@ -63,7 +204,7 @@ export async function GET() {
     }
 
     // Filter and categorize
-    const relevantEmails: ParsedGmailMessage[] = [];
+    const relevantEmails: (ParsedGmailMessage & { matchedProjectId?: string; matchedSubTaskId?: string })[] = [];
     const suggestions: Array<{
       id: string;
       emailId: string;
@@ -85,14 +226,29 @@ export async function GET() {
       const isRelevant = fromContractor || isRenovationRelated(email.subject, email.body);
 
       if (!isRelevant) continue;
-      relevantEmails.push(email);
+
+      // Auto-match email to project/sub-task
+      const match = matchEmailToProject(
+        email.subject,
+        email.body,
+        email.fromEmail,
+        projectsData.projects,
+        contractorEmails
+      );
+
+      const enrichedEmail = {
+        ...email,
+        matchedProjectId: match?.projectId,
+        matchedSubTaskId: match?.subTaskId,
+      };
+      relevantEmails.push(enrichedEmail);
 
       // Detect quotes, dates, status
       const detected = detectQuotesAndDates(email.body);
 
-      // Match to a project
-      let matchedProjectId: string | undefined;
-      if (fromContractor) {
+      // Match to a project (for suggestions)
+      let matchedProjectId: string | undefined = match?.projectId;
+      if (!matchedProjectId && fromContractor) {
         const project = projectsData.projects.find((p) =>
           p.contractorIds.includes(fromContractor.id)
         );

@@ -11,6 +11,7 @@ import type {
   GmailMessage,
   EmailSuggestion,
   GmailConnectionStatus,
+  LinkedEmail,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -75,11 +76,13 @@ interface AppState {
   gmailStatus: GmailConnectionStatus;
   gmailMessages: GmailMessage[];
   emailSuggestions: EmailSuggestion[];
+  linkedEmails: LinkedEmail[];
   checkGmailConnection: () => Promise<void>;
   syncGmail: () => Promise<void>;
   sendGmailEmail: (to: string, subject: string, body: string, projectId?: string, contractorId?: string) => Promise<boolean>;
   acceptSuggestion: (id: string) => void;
   dismissSuggestion: (id: string) => void;
+  linkEmailToProject: (emailId: string, projectId: string, subTaskId?: string) => Promise<void>;
 }
 
 const createEmptyScenario = (name: string): Scenario => ({
@@ -595,6 +598,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   gmailStatus: { connected: false },
   gmailMessages: [],
   emailSuggestions: [],
+  linkedEmails: [],
 
   checkGmailConnection: async () => {
     try {
@@ -681,5 +685,61 @@ export const useAppStore = create<AppState>((set, get) => ({
         sug.id === id ? { ...sug, status: "dismissed" as const } : sug
       ),
     }));
+  },
+
+  linkEmailToProject: async (emailId, projectId, subTaskId?) => {
+    const { gmailMessages, projects, updateProject, linkedEmails } = get();
+
+    // Check if already linked
+    if (linkedEmails.some((le) => le.emailId === emailId)) {
+      // Update existing link
+      set((s) => ({
+        linkedEmails: s.linkedEmails.map((le) =>
+          le.emailId === emailId
+            ? { ...le, projectId, subTaskId, linkedAt: new Date().toISOString() }
+            : le
+        ),
+      }));
+    } else {
+      // Add new link
+      const link: LinkedEmail = {
+        emailId,
+        projectId,
+        subTaskId,
+        linkedAt: new Date().toISOString(),
+      };
+      set((s) => ({ linkedEmails: [...s.linkedEmails, link] }));
+    }
+
+    // Find the email and add as a communication on the project
+    const email = gmailMessages.find((e) => e.id === emailId);
+    const project = projects.find((p) => p.id === projectId);
+    if (!email || !project) return;
+
+    // Check if this email is already logged as a communication
+    const alreadyLogged = project.communications.some(
+      (c) => c.summary.includes(`[Gmail: ${emailId}]`)
+    );
+    if (alreadyLogged) return;
+
+    const subTask = subTaskId
+      ? project.subTasks.find((st) => st.id === subTaskId)
+      : null;
+
+    const comm: ProjectCommunication = {
+      id: uuidv4(),
+      date: email.date ? new Date(email.date).toISOString() : new Date().toISOString(),
+      type: "email",
+      summary: `${email.subject} (from ${email.from})${subTask ? ` [${subTask.title}]` : ""} [Gmail: ${emailId}]`,
+      contractorId: undefined,
+    };
+
+    await updateProject({
+      ...project,
+      communications: [...project.communications, comm],
+    });
+
+    set({ toastMessage: `Email linked to ${project.name}${subTask ? ` > ${subTask.title}` : ""}` });
+    setTimeout(() => set({ toastMessage: null }), 4000);
   },
 }));

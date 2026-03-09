@@ -223,6 +223,15 @@ export interface GmailMessage {
   isRead: boolean;
   labels: string[];
   hasAttachments: boolean;
+  matchedProjectId?: string;
+  matchedSubTaskId?: string;
+}
+
+export interface LinkedEmail {
+  emailId: string;
+  projectId: string;
+  subTaskId?: string;
+  linkedAt: string;
 }
 
 export interface EmailSuggestion {
